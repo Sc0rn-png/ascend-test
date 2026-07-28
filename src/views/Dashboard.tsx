@@ -9,7 +9,7 @@ import {
   cashAvailable, savingsRate, totalNonFinancialAssets, financialPatrimoine,
   totalInvestmentPlan, projectedMonthsToGoal, monthLabel,
 } from '@/lib/calc';
-import { formatEuro, formatPercent } from '@/lib/storage';
+import { formatEuro } from '@/lib/storage';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { ProgressBar } from '@/components/ProgressBar';
 import { Card } from '@/components/ui/card';

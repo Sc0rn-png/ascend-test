@@ -5,7 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, 
 import { useStore } from '@/lib/store';
 import { formatEuro, generateId, formatPercent } from '@/lib/storage';
 import { actualAllocation, allocationColor, monthLabel, totalNonFinancialAssets } from '@/lib/calc';
-import { ASSET_CATEGORIES, FINANCIAL_CATEGORIES, isFinancialCategory, type Asset, type AssetCategory, type NonFinancialAsset } from '@/lib/types';
+import { ASSET_CATEGORIES, isFinancialCategory, type Asset, type AssetCategory, type NonFinancialAsset } from '@/lib/types';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { ProgressBar } from '@/components/ProgressBar';
 import { Card } from '@/components/ui/card';

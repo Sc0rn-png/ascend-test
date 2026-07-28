@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { TrendingUp, Store, Target, Wallet } from 'lucide-react';
+import { TrendingUp, Store, Target } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { useStore } from '@/lib/store';
 import { formatEuro, formatPercent } from '@/lib/storage';

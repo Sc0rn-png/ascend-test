@@ -1,4 +1,4 @@
-import type { AppState, Asset, TargetAllocation, NonFinancialAsset } from './types';
+import type { AppState, Asset } from './types';
 import { isFinancialCategory } from './types';
 
 export function totalAssets(assets: Asset[]): number {

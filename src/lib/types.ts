@@ -79,7 +79,6 @@ export interface BusinessMetrics {
   conversion: number;
   treasury: number;
   previousCa: number;
-  targetMonthlyIncome: number; // Objectif Ex: 1 000 €/mois
 }
 
 export interface InvestmentPlan {
@@ -108,8 +107,7 @@ export interface Snapshot {
   nonFinancialAssets: { name: string; category: string; value: number }[];
   debt: number;
   income: number;
-  businessCa: number;
-  businessProfit: number;
+  business: number;
 }
 
 // Gamification / Succès
