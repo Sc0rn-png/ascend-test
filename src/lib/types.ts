@@ -59,15 +59,17 @@ export interface Debt {
   previousAmount: number;
 }
 
+// Feuille de route ajustée (Objectifs par Année/Trimestre)
 export interface RoadmapGoal {
   id: string;
   label: string;
   target: number;
   current: number;
   done: boolean;
-  quarter: string;
+  quarter: string; // Ex: '2026', '2027' ou 'T3 2026'
 }
 
+// Business Metrics - L'Étendard (Aujourd'hui & Demain)
 export interface BusinessMetrics {
   ca: number;
   profit: number;
@@ -77,6 +79,7 @@ export interface BusinessMetrics {
   conversion: number;
   treasury: number;
   previousCa: number;
+  targetMonthlyIncome: number; // Objectif Ex: 1 000 €/mois
 }
 
 export interface InvestmentPlan {
@@ -94,8 +97,9 @@ export interface TargetAllocation {
   Cash: number;
 }
 
+// Snapshot mensuel complet pour les graphiques & rapports auto
 export interface Snapshot {
-  id: string;
+  id: string; // '2026-08'
   date: string;
   netWorth: number;
   financialPatrimoine: number;
@@ -104,9 +108,11 @@ export interface Snapshot {
   nonFinancialAssets: { name: string; category: string; value: number }[];
   debt: number;
   income: number;
-  business: number;
+  businessCa: number;
+  businessProfit: number;
 }
 
+// Gamification / Succès
 export interface Achievement {
   id: string;
   label: string;
@@ -116,9 +122,20 @@ export interface Achievement {
   unlocked: boolean;
 }
 
+// Calculs statistiques automatiques (Phase 1 & Phase 5)
+export interface PerformanceStats {
+  monthlyProgress: number;          // + € du mois
+  progressFromJanuary: number;      // + € depuis Janvier
+  historicalRecord: number;         // Record net worth atteint
+  remainingCapitalToBuild: number;  // Capital restant avant objectif final
+  estimatedTargetDate: string;      // Date estimée d'atteinte de l'objectif
+  patrimoineCreatedTotal: number;   // Patrimoine créé depuis le lancement
+  averageCapitalPerMonth: number;   // Capital moyen créé / mois
+}
+
 export interface AppState {
-  goal: number;
-  targetDate: string;
+  goal: number; // Ex: 50 000 €
+  targetDate: string; // Ex: '2029-12-08'
   assets: Asset[];
   nonFinancialAssets: NonFinancialAsset[];
   includeNonFinancialInNetWorth: boolean;
