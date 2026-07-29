@@ -70,11 +70,18 @@ describe('deleteMovement', () => {
   });
 
   it('retire l actif non financier materialise', () => {
-    let s = addMovement(emptyState(), { kind: 'actif', amount: 450, date: '2026-07-25', label: 'Bureau' });
-    s = addMovement(s, { kind: 'actif', amount: 900, date: '2026-07-26', label: 'Voiture' });
-    const next = deleteMovement(s, s.movements[0].id);
+    // 'Voiture' est cree en premier pour que 'Bureau', le sujet supprime,
+    // n'atterrisse jamais a l'index 0 de nonFinancialAssets : une suppression
+    // positionnelle (filter par index plutot que par id) serait ainsi demasquee.
+    let s = addMovement(emptyState(), { kind: 'actif', amount: 900, date: '2026-07-25', label: 'Voiture' });
+    s = addMovement(s, { kind: 'actif', amount: 450, date: '2026-07-26', label: 'Bureau' });
+    const bureauMovement = s.movements.find((m) => m.label === 'Bureau')!;
+
+    const next = deleteMovement(s, bureauMovement.id);
+
+    expect(next.nonFinancialAssets.find((a) => a.id === bureauMovement.assetId)).toBeUndefined();
+    expect(next.nonFinancialAssets.find((a) => a.name === 'Voiture')).toBeDefined();
     expect(next.nonFinancialAssets).toHaveLength(1);
-    expect(next.nonFinancialAssets[0].name).toBe('Voiture');
   });
 
   it('ignore un identifiant inconnu', () => {

@@ -46,6 +46,7 @@ describe('cloture mensuelle', () => {
     monter();
     expect(screen.getByTestId('clos').textContent).toBe('aucun');
     expect(screen.getByTestId('mois').textContent).toBe('2026-08');
+    expect(screen.getByTestId('snapshots').textContent).toBe('2026-08');
   });
 
   it('ne cloture rien si le mois en cours est deja enregistre', () => {
