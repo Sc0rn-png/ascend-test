@@ -153,8 +153,10 @@ describe('formatDateFR', () => {
       expect(new Date('2029-12-08').getDate()).toBe(7);
       expect(formatDateFR('2029-12-08')).toBe('8 décembre 2029');
     } finally {
-      process.env.TZ = tz;
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
     }
+    expect(process.env.TZ).toBe(tz);
   });
 });
 
