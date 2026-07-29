@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AddMovementSheet } from './AddMovementSheet';
 import { StoreProvider } from '@/lib/store';
@@ -79,6 +79,55 @@ describe('AddMovementSheet', () => {
       expect(sauvegarde.movements[0].amount).toBe(12.5);
       expect(sauvegarde.movements[0].date).toBe(aujourdhui);
     });
+  });
+
+  // Une date videe produisait un mouvement rattache a aucun mois, donc
+  // introuvable dans la liste et impossible a supprimer.
+  it('refuse une date vide', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.click(screen.getByRole('button', { name: /dépense/i }));
+    await user.type(screen.getByLabelText(/montant/i), '60');
+    fireEvent.change(screen.getByLabelText(/date/i), { target: { value: '' } });
+
+    expect(screen.getByRole('button', { name: /enregistrer/i })).toBeDisabled();
+  });
+
+  // Le clavier francais d Android propose une virgule : elle doit valoir un
+  // separateur decimal, pas une saisie invalide.
+  it('accepte la virgule comme separateur decimal', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.click(screen.getByRole('button', { name: /dépense/i }));
+    await user.type(screen.getByLabelText(/montant/i), '37,42');
+    await user.click(screen.getByRole('button', { name: /enregistrer/i }));
+
+    await waitFor(() => {
+      const sauvegarde = JSON.parse(localStorage.getItem('ascend_state_v3') ?? '{}');
+      expect(sauvegarde.movements[0].amount).toBe(37.42);
+    });
+  });
+
+  it('accepte le point comme separateur decimal', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.click(screen.getByRole('button', { name: /dépense/i }));
+    await user.type(screen.getByLabelText(/montant/i), '37.42');
+    await user.click(screen.getByRole('button', { name: /enregistrer/i }));
+
+    await waitFor(() => {
+      const sauvegarde = JSON.parse(localStorage.getItem('ascend_state_v3') ?? '{}');
+      expect(sauvegarde.movements[0].amount).toBe(37.42);
+    });
+  });
+
+  it('refuse une saisie non numerique', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.click(screen.getByRole('button', { name: /dépense/i }));
+    await user.type(screen.getByLabelText(/montant/i), 'douze');
+
+    expect(screen.getByRole('button', { name: /enregistrer/i })).toBeDisabled();
   });
 
   it('propose la date du jour par defaut', async () => {

@@ -37,6 +37,20 @@ describe('validateState', () => {
     expect(validateState(bad)).toBeNull();
   });
 
+  // Une date hors format rattache le mouvement a aucun mois : il devient
+  // invisible dans la vue Mois, donc impossible a supprimer.
+  it('rejette un mouvement dont la date est vide', () => {
+    const bad = emptyState();
+    bad.movements = [{ id: 'x', date: '', kind: 'depense', amount: 10 }] as never;
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('rejette un mouvement dont la date n est pas au format ISO court', () => {
+    const bad = emptyState();
+    bad.movements = [{ id: 'x', date: '15/07/2026', kind: 'depense', amount: 10 }] as never;
+    expect(validateState(bad)).toBeNull();
+  });
+
   it('accepte un état neutre', () => {
     expect(validateState(emptyState())).not.toBeNull();
   });

@@ -314,7 +314,9 @@ function AssetEditor({ asset, onSave, onClose }: { asset: Asset | null; onSave: 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={onClose}>
+    // Au-dessus de la barre de navigation (z-50), qui recouvrirait sinon le
+    // bouton d'enregistrement sur mobile.
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.3, ease }} className="w-full max-w-md rounded-t-3xl border border-border/60 bg-card p-6 pb-8 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold">{asset ? 'Modifier l\'actif' : 'Nouvel actif'}</h3>
@@ -367,7 +369,9 @@ function NonFinancialEditor({ asset, onSave, onClose }: { asset: NonFinancialAss
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={onClose}>
+    // Au-dessus de la barre de navigation (z-50), qui recouvrirait sinon le
+    // bouton d'enregistrement sur mobile.
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.3, ease }} className="w-full max-w-md rounded-t-3xl border border-border/60 bg-card p-6 pb-8 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold">{asset ? 'Modifier l\'actif' : 'Nouvel actif non financier'}</h3>

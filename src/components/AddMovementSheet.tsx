@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, TrendingUp, TrendingDown, PiggyBank, Sofa } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { todayISO } from '@/lib/storage';
+import { isValidDateISO, todayISO } from '@/lib/storage';
 import { INCOME_SOURCES, isFinancialCategory, type IncomeSource, type MovementKind } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,8 +28,9 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
   const [label, setLabel] = useState('');
 
   const placements = state.assets.filter((a) => isFinancialCategory(a.category));
-  const montant = Number(amount);
-  const valide = Number.isFinite(montant) && montant > 0;
+  // Le clavier francais d'Android propose une virgule pour les decimales.
+  const montant = Number(amount.replace(',', '.'));
+  const valide = Number.isFinite(montant) && montant > 0 && isValidDateISO(date);
 
   const submit = () => {
     if (!kind || !valide) return;
@@ -45,7 +46,9 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
+    // Au-dessus de la barre de navigation (z-50), sans quoi elle recouvre les
+    // boutons de la feuille, ancree en bas sur mobile.
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
       <motion.div
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -79,7 +82,7 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
               <Label htmlFor="montant" className="text-xs">Montant (€)</Label>
               <Input
                 id="montant"
-                type="number"
+                type="text"
                 inputMode="decimal"
                 autoFocus
                 value={amount}

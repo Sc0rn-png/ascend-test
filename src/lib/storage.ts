@@ -87,8 +87,10 @@ function isValidArray<T>(v: unknown, predicate: (item: unknown) => item is T): v
 
 function isValidMovement(v: unknown): v is Movement {
   if (!isRecord(v)) return false;
-  if (typeof v.id !== 'string' || typeof v.date !== 'string') return false;
-  if (typeof v.amount !== 'number' || !Number.isFinite(v.amount)) return false;
+  // Hors format, monthKeyOf ne rend aucun mois : le mouvement n'apparait dans
+  // aucune liste et devient impossible a supprimer.
+  if (typeof v.id !== 'string' || !isValidDateISO(v.date)) return false;
+  if (!isFiniteNumber(v.amount)) return false;
   return MOVEMENT_KINDS.includes(v.kind as Movement['kind']);
 }
 
@@ -126,7 +128,7 @@ function isValidNumberRecord(v: unknown): boolean {
   return Object.values(v).every(isFiniteNumber);
 }
 
-function isValidDateISO(v: unknown): v is string {
+export function isValidDateISO(v: unknown): v is string {
   if (typeof v !== 'string') return false;
   return /^\d{4}-\d{2}-\d{2}$/.test(v);
 }
