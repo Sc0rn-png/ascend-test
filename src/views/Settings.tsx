@@ -1,8 +1,8 @@
 import { useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Moon, Sun, Download, Upload, Target, Calendar, Palette, PiggyBank } from 'lucide-react';
+import { Moon, Sun, Download, Upload, Target, Calendar, Palette, PiggyBank, AlertTriangle } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { formatEuro, exportState, importState } from '@/lib/storage';
+import { formatEuro, exportState, importState, hasQuarantinedState } from '@/lib/storage';
 import { monthLabelLong, totalInvestmentPlan } from '@/lib/calc';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,9 +31,13 @@ export function Settings() {
   };
 
   const handleImport = async (file: File) => {
-    if (aDesDonnees(state) && !window.confirm('Importer ce fichier remplacera toutes les données actuelles. Continuer ?')) return;
     try {
       const imported = await importState(file);
+      if (aDesDonnees(state)) {
+        const actifsNonNuls = imported.assets.filter((a) => a.value !== 0).length;
+        const message = `Ce fichier contient ${imported.movements.length} mouvement(s), ${actifsNonNuls} actif(s) avec une valeur non nulle et ${formatEuro(imported.debtTotal)} de dette. Importer remplacera toutes les données actuelles. Continuer ?`;
+        if (!window.confirm(message)) return;
+      }
       setState(() => imported);
       toast.success('Données importées');
     } catch {
@@ -46,6 +50,21 @@ export function Settings() {
 
   return (
     <div className="space-y-5">
+      {/* Quarantine warning */}
+      {hasQuarantinedState() && (
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease }}>
+          <Card className="border-destructive/50 p-6 dark:border-destructive">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <p className="text-xs font-medium uppercase tracking-wider text-destructive">Données mises de côté</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Des données antérieures n'ont pas pu être relues. Elles ont été mises de côté, pas supprimées. Parle à Jack avant de continuer à saisir.
+            </p>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Goal settings */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1, ease }}>
         <Card className="border-border/50 p-6">
