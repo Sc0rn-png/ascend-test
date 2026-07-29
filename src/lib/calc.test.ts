@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  netWorth, previousNetWorth, netWorthEvolution, investedPatrimoine,
+  netWorth, netWorthEvolution, investedPatrimoine,
   cashAvailable, actualAllocation, progressPercent, formatDateFR, monthLabel,
 } from './calc';
 import { emptyState } from './storage';
@@ -138,10 +138,23 @@ describe('progressPercent', () => {
 });
 
 describe('formatDateFR', () => {
-  // Regression : la date etait stockee en ISO complet, si bien qu un minuit
-  // local repassait a la veille en UTC et affichait un jour d ecart.
   it('affiche le jour saisi sans decalage', () => {
     expect(formatDateFR('2029-12-08')).toBe('8 décembre 2029');
+  });
+
+  // Le decalage d origine n est observable que depuis un fuseau en retard sur
+  // UTC : depuis Paris, l ancien code et le nouveau rendent la meme chaine.
+  it('n avance ni ne recule le jour depuis un fuseau en retard sur UTC', () => {
+    const tz = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      // Si le changement de fuseau n a pas pris effet, cette assertion echoue
+      // et signale que le test qui suit ne prouve rien.
+      expect(new Date('2029-12-08').getDate()).toBe(7);
+      expect(formatDateFR('2029-12-08')).toBe('8 décembre 2029');
+    } finally {
+      process.env.TZ = tz;
+    }
   });
 });
 
