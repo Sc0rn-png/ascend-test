@@ -30,6 +30,15 @@ describe('currentMilestone', () => {
     expect(m.isFinal).toBe(true);
     expect(m.percent).toBe(100);
     expect(m.to).toBe(50000);
+    expect(m.from).toBe(25000);
+  });
+
+  it('considere le dernier palier atteint a l euro pres', () => {
+    const m = currentMilestone(50000, -5000);
+    expect(m.isFinal).toBe(true);
+    expect(m.percent).toBe(100);
+    expect(m.to).toBe(50000);
+    expect(m.from).toBe(25000);
   });
 
   it('ne divise pas par zero quand le depart egale la cible', () => {
