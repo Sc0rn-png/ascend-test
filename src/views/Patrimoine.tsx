@@ -35,7 +35,7 @@ export function Patrimoine() {
       }))
     : [{ label: 'Maintenant', net: netWorth(state), financial: totalFinancialAssets(state), nonFinancial: totalNonFinancialAssets(state) }];
 
-  const totalFinancial = state.assets.filter((a) => isFinancialCategory(a.category)).reduce((sum, a) => sum + a.value, 0);
+  const totalFinancial = totalFinancialAssets(state);
   const totalNonFinancial = totalNonFinancialAssets(state);
 
   const removeAsset = (id: string) => {

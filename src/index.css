@@ -89,9 +89,6 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  .glass {
-    background: hsl(var(--card) / 0.98);
-  }
   .text-balance {
     text-wrap: balance;
   }

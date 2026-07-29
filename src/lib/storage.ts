@@ -27,14 +27,6 @@ export function formatEuro(value: number): string {
   }).format(Math.round(value));
 }
 
-export function formatEuroDetailed(value: number): string {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
 export function formatPercent(value: number): string {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(1)}%`;

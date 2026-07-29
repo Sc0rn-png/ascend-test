@@ -34,23 +34,6 @@ export function financialPatrimoine(state: AppState): number {
   return totalFinancialAssets(state);
 }
 
-export function cashAvailable(state: AppState): number {
-  return state.assets
-    .filter((a) => a.category === 'Cash' || a.category === 'Compte courant' || a.category === 'Livret A')
-    .reduce((sum, a) => sum + a.value, 0);
-}
-
-export function investedPatrimoine(state: AppState): number {
-  return state.assets
-    .filter((a) => a.category === 'PEA' || a.category === 'CTO' || a.category === 'Bitcoin')
-    .reduce((sum, a) => sum + a.value, 0);
-}
-
-export function progressPercent(state: AppState): number {
-  if (state.goal === 0) return 0;
-  return Math.max(0, Math.min(100, (netWorth(state) / state.goal) * 100));
-}
-
 export function daysUntilTarget(targetDate: string): number {
   const now = new Date();
   const target = new Date(`${targetDate}T00:00:00`);

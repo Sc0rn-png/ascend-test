@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  netWorth, netWorthEvolution, investedPatrimoine,
-  cashAvailable, actualAllocation, progressPercent, formatDateFR, monthLabel,
-} from './calc';
+import { netWorth, netWorthEvolution, actualAllocation, formatDateFR, monthLabel } from './calc';
 import { emptyState } from './storage';
 import type { AppState, Asset } from './types';
 
@@ -76,37 +73,6 @@ describe('previousNetWorth', () => {
   });
 });
 
-describe('investedPatrimoine', () => {
-  // Regression : 'Autres' etait compte comme investi alors qu'il est exclu du
-  // patrimoine financier, ce qui rendait l investi superieur au total.
-  it('ne compte que PEA, CTO et Bitcoin', () => {
-    const s = state({
-      assets: [
-        asset({ category: 'PEA', value: 700 }),
-        asset({ id: 'b', category: 'CTO', value: 1300 }),
-        asset({ id: 'c', category: 'Bitcoin', value: 140 }),
-        asset({ id: 'd', category: 'Livret A', value: 200 }),
-        asset({ id: 'e', category: 'Autres', value: 999 }),
-      ],
-    });
-    expect(investedPatrimoine(s)).toBe(2140);
-  });
-});
-
-describe('cashAvailable', () => {
-  it('additionne Cash, Compte courant et Livret A', () => {
-    const s = state({
-      assets: [
-        asset({ category: 'Cash', value: 100 }),
-        asset({ id: 'b', category: 'Compte courant', value: 500 }),
-        asset({ id: 'c', category: 'Livret A', value: 200 }),
-        asset({ id: 'd', category: 'PEA', value: 700 }),
-      ],
-    });
-    expect(cashAvailable(s)).toBe(800);
-  });
-});
-
 describe('actualAllocation', () => {
   it('regroupe Compte courant avec Cash et renomme Livret A', () => {
     const s = state({
@@ -123,17 +89,6 @@ describe('actualAllocation', () => {
 
   it('renvoie un tableau vide sans patrimoine', () => {
     expect(actualAllocation(state())).toEqual([]);
-  });
-});
-
-describe('progressPercent', () => {
-  it('ne descend jamais sous zero avec une valeur nette negative', () => {
-    const s = state({ assets: [], debtTotal: 5000, goal: 50000 });
-    expect(progressPercent(s)).toBe(0);
-  });
-
-  it('vaut zero si l objectif est nul', () => {
-    expect(progressPercent(state({ goal: 0 }))).toBe(0);
   });
 });
 
