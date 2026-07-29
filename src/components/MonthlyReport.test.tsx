@@ -55,6 +55,24 @@ describe('MonthlyReport', () => {
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 
+  it('affiche le montant sans pourcentage quand le mois traverse le zero vers le haut', () => {
+    // Le mois precedent est negatif : rapporter une progression a une base
+    // negative ne veut rien dire.
+    seed({ snapshots: [snap('2026-06', -500), snap('2026-07', 800)] });
+    renderReport('2026-07');
+
+    expect(screen.getByText('+1 300 €')).toBeInTheDocument();
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  });
+
+  it('affiche le montant sans pourcentage quand le mois traverse le zero vers le bas', () => {
+    seed({ snapshots: [snap('2026-06', 800), snap('2026-07', -500)] });
+    renderReport('2026-07');
+
+    expect(screen.getByText(/1 300 €/)).toBeInTheDocument();
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  });
+
   it('appelle onDismiss au clic sur le bouton de fermeture', async () => {
     const user = userEvent.setup();
     seed({ snapshots: [snap('2026-07', 1000)] });
