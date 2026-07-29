@@ -9,6 +9,7 @@ export interface MovementDraft {
   date: string;
   source?: IncomeSource;
   assetId?: string;
+  fromAssetId?: string;
   label?: string;
 }
 
@@ -38,6 +39,10 @@ export function addMovement(state: AppState, draft: MovementDraft): AppState {
     next.assets = applyToAsset(next.assets, draft.assetId, delta);
   }
 
+  if (draft.fromAssetId) {
+    next.assets = applyToAsset(next.assets, draft.fromAssetId, -draft.amount);
+  }
+
   if (draft.kind === 'actif') {
     const created = {
       id: generateId(),
@@ -63,6 +68,10 @@ export function deleteMovement(state: AppState, id: string): AppState {
   const delta = assetDelta(movement.kind, movement.amount);
   if (delta !== 0 && movement.assetId) {
     next.assets = applyToAsset(next.assets, movement.assetId, -delta);
+  }
+
+  if (movement.fromAssetId) {
+    next.assets = applyToAsset(next.assets, movement.fromAssetId, movement.amount);
   }
 
   if (movement.kind === 'actif' && movement.assetId) {

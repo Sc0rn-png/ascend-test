@@ -55,6 +55,20 @@ describe('Mois', () => {
     expect(screen.getByText(/15\/07\/2026 · Compte courant/)).toBeInTheDocument();
   });
 
+  it('nomme le compte qui a finance un versement', () => {
+    seed({
+      assets: [
+        { id: 'cc', name: 'Compte courant', category: 'Compte courant', value: 300, target: 0, previousValue: 300 },
+        { id: 'cto', name: 'CTO', category: 'CTO', value: 1500, target: 0, previousValue: 1500 },
+      ],
+      movements: [mvt({ kind: 'investissement', amount: 200, assetId: 'cto', fromAssetId: 'cc' })],
+    });
+    renderMois();
+
+    expect(screen.getByText('Investissement — CTO')).toBeInTheDocument();
+    expect(screen.getByText(/15\/07\/2026 · depuis Compte courant/)).toBeInTheDocument();
+  });
+
   it('n affiche aucun compte quand la depense n en impute pas', () => {
     seed({ movements: [mvt({ kind: 'depense', amount: 60 })] });
     renderMois();

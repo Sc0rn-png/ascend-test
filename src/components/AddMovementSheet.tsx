@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, TrendingUp, TrendingDown, PiggyBank, Sofa } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { isValidDateISO, todayISO } from '@/lib/storage';
-import { INCOME_SOURCES, isFinancialCategory, type IncomeSource, type MovementKind } from '@/lib/types';
+import { formatEuro, isValidDateISO, todayISO } from '@/lib/storage';
+import { INCOME_SOURCES, isFinancialCategory, type Asset, type IncomeSource, type MovementKind } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,55 @@ const KINDS: { id: MovementKind; label: string; icon: typeof TrendingUp }[] = [
   { id: 'investissement', label: 'Investissement', icon: PiggyBank },
   { id: 'actif', label: 'Actif', icon: Sofa },
 ];
+
+const choix = (actif: boolean) =>
+  cn(
+    'rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
+    actif ? 'border-primary bg-primary/10 text-primary' : 'border-border/60 text-muted-foreground'
+  );
+
+function ComptePicker({
+  titre,
+  comptes,
+  valeur,
+  onChange,
+  montant,
+  sens,
+}: {
+  titre: string;
+  comptes: Asset[];
+  valeur: string;
+  onChange: (id: string) => void;
+  montant: number;
+  sens: 1 | -1;
+}) {
+  const choisi = comptes.find((a) => a.id === valeur);
+  const bouge = Number.isFinite(montant) && montant > 0;
+
+  return (
+    <div>
+      <Label className="text-xs">{titre}</Label>
+      <div className="mt-1 grid grid-cols-2 gap-2">
+        {comptes.map((a) => (
+          <button key={a.id} onClick={() => onChange(a.id)} className={choix(valeur === a.id)}>
+            {a.name}
+          </button>
+        ))}
+        {/* Rattrapage de fin de mois : le solde a deja ete recale a la main, le
+            mouvement ne doit alors compter que dans le bilan. */}
+        <button onClick={() => onChange('')} className={choix(valeur === '')}>
+          Ne pas impacter
+        </button>
+      </div>
+      {choisi && (
+        <p className="mt-2 text-[11px] tabular-nums text-muted-foreground">
+          {choisi.name} : {formatEuro(choisi.value)}
+          {bouge && ` → ${formatEuro(choisi.value + sens * montant)}`}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function AddMovementSheet({ onClose }: { onClose: () => void }) {
   const { state, addMovement } = useStore();
@@ -33,9 +82,17 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
   const compteParDefaut =
     comptes.find((a) => a.category === 'Compte courant') ?? comptes.find((a) => a.category === 'Cash') ?? comptes[0];
   const [compteId, setCompteId] = useState(compteParDefaut?.id ?? '');
+
   // Le clavier francais d'Android propose une virgule pour les decimales.
   const montant = Number(amount.replace(',', '.'));
   const valide = Number.isFinite(montant) && montant > 0 && isValidDateISO(date);
+
+  const choisirType = (id: MovementKind) => {
+    setKind(id);
+    // Une acquisition est souvent l'inventaire d'un bien deja possede : rien ne
+    // doit sortir d'un compte tant que le compte n'a pas ete choisi.
+    setCompteId(id === 'actif' ? '' : (compteParDefaut?.id ?? ''));
+  };
 
   const submit = () => {
     if (!kind || !valide) return;
@@ -50,6 +107,7 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
           : kind === 'depense' || kind === 'revenu'
             ? compteId || undefined
             : undefined,
+      fromAssetId: kind === 'investissement' || kind === 'actif' ? compteId || undefined : undefined,
       label: kind === 'revenu' || kind === 'actif' ? label || undefined : undefined,
     });
     onClose();
@@ -63,7 +121,9 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.25, ease }}
-        className="w-full max-w-md rounded-t-3xl border border-border/60 bg-card p-6 pb-8 sm:rounded-3xl"
+        // Le choix du compte allonge le formulaire : sans hauteur bornee, son
+        // haut sortait de l'ecran une fois le clavier Android ouvert.
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border/60 bg-card p-6 pb-8 sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -78,7 +138,7 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
             {KINDS.map(({ id, label: l, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => setKind(id)}
+                onClick={() => choisirType(id)}
                 className="flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-secondary/40 p-5 transition-colors hover:bg-secondary"
               >
                 <Icon className="h-6 w-6 text-primary" />
@@ -106,14 +166,7 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
                 <Label className="text-xs">Source</Label>
                 <div className="mt-1 grid grid-cols-2 gap-2">
                   {INCOME_SOURCES.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setSource(s)}
-                      className={cn(
-                        'rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
-                        source === s ? 'border-primary bg-primary/10 text-primary' : 'border-border/60 text-muted-foreground'
-                      )}
-                    >
+                    <button key={s} onClick={() => setSource(s)} className={choix(source === s)}>
                       {s}
                     </button>
                   ))}
@@ -128,37 +181,6 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            {(kind === 'depense' || kind === 'revenu') && (
-              <div>
-                <Label className="text-xs">{kind === 'depense' ? 'Payé depuis' : 'Reçu sur'}</Label>
-                <div className="mt-1 grid grid-cols-2 gap-2">
-                  {comptes.map((a) => (
-                    <button
-                      key={a.id}
-                      onClick={() => setCompteId(a.id)}
-                      className={cn(
-                        'rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
-                        compteId === a.id ? 'border-primary bg-primary/10 text-primary' : 'border-border/60 text-muted-foreground'
-                      )}
-                    >
-                      {a.name}
-                    </button>
-                  ))}
-                  {/* Rattrapage de fin de mois : le solde a deja ete recale a la
-                      main, le mouvement ne doit alors compter que dans le bilan. */}
-                  <button
-                    onClick={() => setCompteId('')}
-                    className={cn(
-                      'rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
-                      compteId === '' ? 'border-primary bg-primary/10 text-primary' : 'border-border/60 text-muted-foreground'
-                    )}
-                  >
-                    Ne pas impacter
-                  </button>
-                </div>
-              </div>
-            )}
-
             {kind === 'investissement' && (
               <div>
                 <Label className="text-xs">Placement</Label>
@@ -166,11 +188,12 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
                   {comptes.map((a) => (
                     <button
                       key={a.id}
-                      onClick={() => setAssetId(a.id)}
-                      className={cn(
-                        'rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
-                        assetId === a.id ? 'border-primary bg-primary/10 text-primary' : 'border-border/60 text-muted-foreground'
-                      )}
+                      onClick={() => {
+                        setAssetId(a.id);
+                        // Un versement d'un compte vers lui-meme ne veut rien dire.
+                        if (compteId === a.id) setCompteId('');
+                      }}
+                      className={choix(assetId === a.id)}
                     >
                       {a.name}
                     </button>
@@ -184,6 +207,28 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
                 <Label htmlFor="actif" className="text-xs">Quoi</Label>
                 <Input id="actif" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Bureau, meuble..." className="mt-1" />
               </div>
+            )}
+
+            {(kind === 'depense' || kind === 'revenu') && (
+              <ComptePicker
+                titre={kind === 'depense' ? 'Payé depuis' : 'Reçu sur'}
+                comptes={comptes}
+                valeur={compteId}
+                onChange={setCompteId}
+                montant={montant}
+                sens={kind === 'revenu' ? 1 : -1}
+              />
+            )}
+
+            {(kind === 'investissement' || kind === 'actif') && (
+              <ComptePicker
+                titre="Payé depuis"
+                comptes={comptes.filter((a) => kind !== 'investissement' || a.id !== assetId)}
+                valeur={compteId}
+                onChange={setCompteId}
+                montant={montant}
+                sens={-1}
+              />
             )}
 
             <div>
