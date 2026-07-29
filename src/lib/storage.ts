@@ -106,7 +106,7 @@ function isValidNonFinancialAsset(v: unknown): v is NonFinancialAsset {
   return true;
 }
 
-function isValidSnapshot(v: unknown) {
+function isValidSnapshot(v: unknown): v is { id: string; netWorth: number; financialPatrimoine: number; nonFinancialPatrimoine: number; debtTotal: number; encaisse: number; depense: number; investi: number } {
   if (!isRecord(v)) return false;
   if (typeof v.id !== 'string') return false;
   return (
