@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { validateState, migrateV2, emptyState, formatEuro, loadState, saveState } from './storage';
+import { validateState, migrateV2, emptyState, seedState, formatEuro, loadState, saveState } from './storage';
+import { netWorth } from './calc';
 
 describe('validateState', () => {
   it('rejette un objet vide', () => {
@@ -323,5 +324,44 @@ describe('saveState', () => {
 describe('formatEuro', () => {
   it('formate sans decimales', () => {
     expect(formatEuro(2840.4).replace(/\u202f|\u00a0/g, ' ')).toBe('2 840 €');
+  });
+});
+
+describe('seedState', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('reprend la situation deja saisie par Thomas', () => {
+    const s = seedState();
+    expect(s.goal).toBe(50000);
+    expect(s.targetDate).toBe('2029-12-08');
+    expect(s.debtTotal).toBe(5000);
+    expect(s.assets.find((a) => a.name === 'CTO')?.value).toBe(1300);
+    expect(s.investmentPlan).toEqual({ PEA: 250, CTO: 200, Bitcoin: 50, LivretA: 100 });
+  });
+
+  it('part d une valeur nette de -2160 euros', () => {
+    expect(netWorth(seedState())).toBe(-2160);
+  });
+
+  it('aligne le plus bas enregistre sur la valeur nette de depart', () => {
+    const s = seedState();
+    expect(s.lowestNetWorth).toBe(netWorth(s));
+  });
+
+  it('demarre sans mouvement : les rentrees et depenses se saisissent au fil de l eau', () => {
+    expect(seedState().movements).toEqual([]);
+  });
+
+  it('est ce que loadState installe sur un stockage vierge', () => {
+    expect(netWorth(loadState())).toBe(-2160);
+  });
+
+  it('laisse emptyState neutre, car il sert de base de fusion a l import', () => {
+    expect(netWorth(emptyState())).toBe(0);
+    expect(emptyState().debtTotal).toBe(0);
+  });
+
+  it('passe sa propre validation', () => {
+    expect(validateState(JSON.parse(JSON.stringify(seedState())))).not.toBeNull();
   });
 });

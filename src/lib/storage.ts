@@ -65,6 +65,41 @@ export function emptyState(): AppState {
   };
 }
 
+function asset(name: string, category: Asset['category'], value: number, target: number): Asset {
+  return { id: generateId(), name, category, value, target, previousValue: value };
+}
+
+// Etat de depart d'une installation neuve : la situation que Thomas avait deja
+// saisie. `emptyState` reste neutre car il sert de base de fusion a l'import,
+// ou completer les champs absents avec des chiffres reels serait faux.
+export function seedState(): AppState {
+  const assets = [
+    asset('PEA', 'PEA', 700, 10000),
+    asset('CTO', 'CTO', 1300, 22500),
+    asset('Bitcoin', 'Bitcoin', 140, 5000),
+    asset('Livret A', 'Livret A', 200, 5000),
+    asset('Cash', 'Cash', 0, 7500),
+    asset('Compte courant', 'Compte courant', 500, 2000),
+  ];
+  const debtTotal = 5000;
+  const patrimoine = assets.reduce((sum, a) => sum + a.value, 0);
+
+  return {
+    ...emptyState(),
+    goal: 50000,
+    targetDate: '2029-12-08',
+    assets,
+    nonFinancialAssets: [
+      { id: generateId(), name: 'Collection One Piece', category: 'Collection', value: 600, previousValue: 600 },
+      { id: generateId(), name: 'Meubles / Appareils', category: 'Mobilier & Équipement', value: 1500, previousValue: 1500 },
+    ],
+    debtTotal,
+    previousDebtTotal: debtTotal,
+    lowestNetWorth: patrimoine - debtTotal,
+    investmentPlan: { PEA: 250, CTO: 200, Bitcoin: 50, LivretA: 100 },
+  };
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
@@ -239,7 +274,7 @@ export function loadState(): AppState {
     }
   }
 
-  const fresh = emptyState();
+  const fresh = seedState();
   saveState(fresh);
   return fresh;
 }
