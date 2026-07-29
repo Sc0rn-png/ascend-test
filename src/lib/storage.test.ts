@@ -30,6 +30,150 @@ describe('validateState', () => {
     delete partial.theme;
     expect(validateState(partial)?.theme).toBe('dark');
   });
+
+  it('rejette nonFinancialAssets non-tableau', () => {
+    const bad = { ...emptyState(), nonFinancialAssets: 'oui' };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('accepte nonFinancialAssets valide', () => {
+    const good = {
+      ...emptyState(),
+      nonFinancialAssets: [
+        { id: 'n1', name: 'Meuble', category: 'Mobilier', value: 1500, previousValue: 1500 },
+      ],
+    };
+    expect(validateState(good)?.nonFinancialAssets).toHaveLength(1);
+  });
+
+  it('rejette nonFinancialAssets avec champs manquants', () => {
+    const bad = { ...emptyState(), nonFinancialAssets: [{ id: 'n', name: 'Meuble', value: 1500 }] as never };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('rejette snapshots non-tableau', () => {
+    const bad = { ...emptyState(), snapshots: 'oui' };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('accepte snapshots valide', () => {
+    const good = {
+      ...emptyState(),
+      snapshots: [
+        {
+          id: '2026-07',
+          netWorth: 5000,
+          financialPatrimoine: 3000,
+          nonFinancialPatrimoine: 2000,
+          debtTotal: 1000,
+          encaisse: 500,
+          depense: 200,
+          investi: 100,
+        },
+      ],
+    };
+    expect(validateState(good)?.snapshots).toHaveLength(1);
+  });
+
+  it('rejette snapshots avec champs manquants', () => {
+    const bad = {
+      ...emptyState(),
+      snapshots: [{ id: '2026-07', netWorth: 5000 }] as never,
+    };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('rejette goal non-nombre', () => {
+    const bad = { ...emptyState(), goal: 'mille' };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('rejette previousDebtTotal non-nombre', () => {
+    const bad = { ...emptyState(), previousDebtTotal: 'mille' };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('rejette lowestNetWorth non-nombre', () => {
+    const bad = { ...emptyState(), lowestNetWorth: 'mille' };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('rejette targetDate au mauvais format', () => {
+    const bad = { ...emptyState(), targetDate: '2026/07/29' };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('accepte targetDate au bon format', () => {
+    const good = { ...emptyState(), targetDate: '2026-07-29' };
+    expect(validateState(good)?.targetDate).toBe('2026-07-29');
+  });
+
+  it('rejette theme invalide', () => {
+    const bad = { ...emptyState(), theme: 'bright' as never };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('accepte theme valide', () => {
+    const good = { ...emptyState(), theme: 'light' };
+    expect(validateState(good)?.theme).toBe('light');
+  });
+
+  it('rejette lastUpdateMonth au mauvais format', () => {
+    const bad = { ...emptyState(), lastUpdateMonth: '2026-13' };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('accepte lastUpdateMonth null', () => {
+    const good = { ...emptyState(), lastUpdateMonth: null };
+    expect(validateState(good)?.lastUpdateMonth).toBeNull();
+  });
+
+  it('accepte lastUpdateMonth au bon format', () => {
+    const good = { ...emptyState(), lastUpdateMonth: '2026-07' };
+    expect(validateState(good)?.lastUpdateMonth).toBe('2026-07');
+  });
+
+  it('rejette includeNonFinancialInNetWorth non-booleen', () => {
+    const bad = { ...emptyState(), includeNonFinancialInNetWorth: 'oui' };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('accepte includeNonFinancialInNetWorth booleen', () => {
+    const good = { ...emptyState(), includeNonFinancialInNetWorth: true };
+    expect(validateState(good)?.includeNonFinancialInNetWorth).toBe(true);
+  });
+
+  it('rejette investmentPlan avec valeurs non-nombres', () => {
+    const bad = {
+      ...emptyState(),
+      investmentPlan: { PEA: 100, CTO: 'deux-cents', Bitcoin: 50, LivretA: 100 },
+    };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('accepte investmentPlan avec nombres valides', () => {
+    const good = {
+      ...emptyState(),
+      investmentPlan: { PEA: 100, CTO: 200, Bitcoin: 50, LivretA: 100 },
+    };
+    expect(validateState(good)?.investmentPlan.CTO).toBe(200);
+  });
+
+  it('rejette targetAllocation avec valeurs non-nombres', () => {
+    const bad = {
+      ...emptyState(),
+      targetAllocation: { PEA: 20, CTO: 45, Bitcoin: 10, LivretA: 10, Cash: 'non' },
+    };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('accepte targetAllocation avec nombres valides', () => {
+    const good = {
+      ...emptyState(),
+      targetAllocation: { PEA: 20, CTO: 45, Bitcoin: 10, LivretA: 10, Cash: 15 },
+    };
+    expect(validateState(good)?.targetAllocation.CTO).toBe(45);
+  });
 });
 
 describe('migrateV2', () => {

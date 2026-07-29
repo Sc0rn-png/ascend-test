@@ -76,6 +76,14 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
+function isValidArray<T>(v: unknown, predicate: (item: unknown) => item is T): v is T[] {
+  return Array.isArray(v) && v.every(predicate);
+}
+
 function isValidMovement(v: unknown): v is Movement {
   if (!isRecord(v)) return false;
   if (typeof v.id !== 'string' || typeof v.date !== 'string') return false;
@@ -90,20 +98,73 @@ function isValidAsset(v: unknown): v is Asset {
   return ASSET_CATEGORIES.includes(v.category as Asset['category']);
 }
 
+function isValidNonFinancialAsset(v: unknown): v is NonFinancialAsset {
+  if (!isRecord(v)) return false;
+  if (typeof v.id !== 'string' || typeof v.name !== 'string') return false;
+  if (typeof v.category !== 'string') return false;
+  if (!isFiniteNumber(v.value) || !isFiniteNumber(v.previousValue)) return false;
+  return true;
+}
+
+function isValidSnapshot(v: unknown) {
+  if (!isRecord(v)) return false;
+  if (typeof v.id !== 'string') return false;
+  return (
+    isFiniteNumber(v.netWorth) &&
+    isFiniteNumber(v.financialPatrimoine) &&
+    isFiniteNumber(v.nonFinancialPatrimoine) &&
+    isFiniteNumber(v.debtTotal) &&
+    isFiniteNumber(v.encaisse) &&
+    isFiniteNumber(v.depense) &&
+    isFiniteNumber(v.investi)
+  );
+}
+
+function isValidNumberRecord(v: unknown): boolean {
+  if (!isRecord(v)) return false;
+  return Object.values(v).every(isFiniteNumber);
+}
+
+function isValidDateISO(v: unknown): v is string {
+  if (typeof v !== 'string') return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(v);
+}
+
+function isValidMonthISO(v: unknown): v is string {
+  if (typeof v !== 'string') return false;
+  const match = /^(\d{4})-(\d{2})$/.exec(v);
+  if (!match) return false;
+  const month = parseInt(match[2], 10);
+  return month >= 1 && month <= 12;
+}
+
 export function validateState(raw: unknown): AppState | null {
   if (!isRecord(raw)) return null;
 
   if (Object.keys(raw).length === 0) return null;
 
   if (raw.movements !== undefined) {
-    if (!Array.isArray(raw.movements)) return null;
-    if (!raw.movements.every(isValidMovement)) return null;
+    if (!isValidArray(raw.movements, isValidMovement)) return null;
   }
   if (raw.assets !== undefined) {
-    if (!Array.isArray(raw.assets)) return null;
-    if (!raw.assets.every(isValidAsset)) return null;
+    if (!isValidArray(raw.assets, isValidAsset)) return null;
   }
-  if (raw.debtTotal !== undefined && typeof raw.debtTotal !== 'number') return null;
+  if (raw.nonFinancialAssets !== undefined) {
+    if (!isValidArray(raw.nonFinancialAssets, isValidNonFinancialAsset)) return null;
+  }
+  if (raw.snapshots !== undefined) {
+    if (!isValidArray(raw.snapshots, isValidSnapshot)) return null;
+  }
+  if (raw.goal !== undefined && !isFiniteNumber(raw.goal)) return null;
+  if (raw.debtTotal !== undefined && !isFiniteNumber(raw.debtTotal)) return null;
+  if (raw.previousDebtTotal !== undefined && !isFiniteNumber(raw.previousDebtTotal)) return null;
+  if (raw.lowestNetWorth !== undefined && !isFiniteNumber(raw.lowestNetWorth)) return null;
+  if (raw.targetDate !== undefined && !isValidDateISO(raw.targetDate)) return null;
+  if (raw.theme !== undefined && raw.theme !== 'dark' && raw.theme !== 'light') return null;
+  if (raw.lastUpdateMonth !== undefined && raw.lastUpdateMonth !== null && !isValidMonthISO(raw.lastUpdateMonth)) return null;
+  if (raw.includeNonFinancialInNetWorth !== undefined && typeof raw.includeNonFinancialInNetWorth !== 'boolean') return null;
+  if (raw.investmentPlan !== undefined && !isValidNumberRecord(raw.investmentPlan)) return null;
+  if (raw.targetAllocation !== undefined && !isValidNumberRecord(raw.targetAllocation)) return null;
 
   const base = emptyState();
   return {
@@ -187,7 +248,7 @@ export function importState(file: File): Promise<AppState> {
       try {
         const parsed = validateState(JSON.parse(reader.result as string));
         if (!parsed) {
-          reject(new Error('Ce fichier ne contient pas des donnees ASCEND valides'));
+          reject(new Error('Ce fichier ne contient pas des données ASCEND valides'));
           return;
         }
         resolve(parsed);
