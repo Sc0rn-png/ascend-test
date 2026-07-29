@@ -90,9 +90,7 @@
     scrollbar-width: none;
   }
   .glass {
-    background: hsl(var(--card) / 0.7);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    background: hsl(var(--card) / 0.98);
   }
   .text-balance {
     text-wrap: balance;
