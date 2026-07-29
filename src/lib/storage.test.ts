@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { validateState, migrateV2, emptyState, seedState, formatEuro, loadState, saveState } from './storage';
+import { validateState, migrateV2, emptyState, seedState, formatEuro, loadState, saveState, hasQuarantinedState } from './storage';
 import { netWorth } from './calc';
 
 describe('validateState', () => {
@@ -257,6 +257,20 @@ describe('migrateV2', () => {
   it('renvoie null sur une entree non exploitable', () => {
     expect(migrateV2({ nawak: true })).toBeNull();
   });
+
+  // Le v2 ne portait pas forcement previousValue ni target : les rejeter
+  // faisait disparaitre un placement reel de la valeur nette migree, sans
+  // erreur ni compte, plutot que de le reparer.
+  it('repare un placement v2 sans previousValue ni target au lieu de le rejeter', () => {
+    const v2Incomplet = {
+      ...v2,
+      assets: [{ id: 'a', name: 'PEA', category: 'PEA', value: 700 }],
+    };
+    const migre = migrateV2(v2Incomplet);
+    expect(migre?.assets).toHaveLength(1);
+    expect(migre?.assets[0].previousValue).toBe(700);
+    expect(migre?.assets[0].target).toBe(0);
+  });
 });
 
 describe('loadState', () => {
@@ -301,6 +315,46 @@ describe('loadState', () => {
     expect(loadState().goal).toBe(42000);
     expect(localStorage.getItem('ascend_state_v3.broken')).toBeNull();
     expect(localStorage.getItem('ascend_state_v3')).toBe(bon);
+  });
+
+  it('une premiere corruption va sous la cle principale', () => {
+    const corruption1 = '{ premiere corruption';
+    localStorage.setItem('ascend_state_v3', corruption1);
+    loadState();
+    expect(localStorage.getItem('ascend_state_v3.broken')).toBe(corruption1);
+    expect(localStorage.getItem('ascend_state_v3.broken.last')).toBeNull();
+  });
+
+  // La premiere copie archivee est la plus riche : une corruption suivante
+  // arrive forcement sur un etat deja degrade. On garde donc la premiere et
+  // la plus recente, sans ecraser celle du milieu.
+  it('une seconde corruption preserve la premiere et va sous la cle secondaire', () => {
+    const corruption1 = '{ premiere corruption';
+    const corruption2 = '{ seconde corruption';
+    localStorage.setItem('ascend_state_v3', corruption1);
+    loadState();
+    localStorage.setItem('ascend_state_v3', corruption2);
+    loadState();
+    expect(localStorage.getItem('ascend_state_v3.broken')).toBe(corruption1);
+    expect(localStorage.getItem('ascend_state_v3.broken.last')).toBe(corruption2);
+  });
+});
+
+describe('hasQuarantinedState', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('faux quand rien n est en quarantaine', () => {
+    expect(hasQuarantinedState()).toBe(false);
+  });
+
+  it('vrai quand la cle principale est presente', () => {
+    localStorage.setItem('ascend_state_v3.broken', '{ corrompu');
+    expect(hasQuarantinedState()).toBe(true);
+  });
+
+  it('vrai quand seule la cle secondaire est presente', () => {
+    localStorage.setItem('ascend_state_v3.broken.last', '{ corrompu');
+    expect(hasQuarantinedState()).toBe(true);
   });
 });
 

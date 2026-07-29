@@ -9,6 +9,7 @@ import {
 const STORAGE_KEY = 'ascend_state_v3';
 const LEGACY_KEY = 'ascend_state_v2';
 const BROKEN_KEY = 'ascend_state_v3.broken';
+const BROKEN_LAST_KEY = 'ascend_state_v3.broken.last';
 
 export function generateId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -128,6 +129,24 @@ function isValidAsset(v: unknown): v is Asset {
   return ASSET_CATEGORIES.includes(v.category as Asset['category']);
 }
 
+// Un actif v2 sans previousValue ni target n'est pas corrompu : le v2 ne
+// portait pas forcement ces deux champs. On le repare au lieu de le rejeter,
+// pour ne pas faire disparaitre un placement reel de la valeur nette migree.
+function normalizeV2Asset(v: unknown): Asset | null {
+  if (!isRecord(v)) return null;
+  if (typeof v.id !== 'string' || typeof v.name !== 'string') return null;
+  if (!isFiniteNumber(v.value)) return null;
+  if (!ASSET_CATEGORIES.includes(v.category as Asset['category'])) return null;
+  return {
+    id: v.id,
+    name: v.name,
+    category: v.category as Asset['category'],
+    value: v.value,
+    previousValue: isFiniteNumber(v.previousValue) ? v.previousValue : v.value,
+    target: isFiniteNumber(v.target) ? v.target : 0,
+  };
+}
+
 function isValidNonFinancialAsset(v: unknown): v is NonFinancialAsset {
   if (!isRecord(v)) return false;
   if (typeof v.id !== 'string' || typeof v.name !== 'string') return false;
@@ -210,7 +229,9 @@ export function migrateV2(raw: unknown): AppState | null {
   const base = emptyState();
   const debts = Array.isArray(raw.debts) ? (raw.debts as Record<string, number>[]) : [];
 
-  const assets = (raw.assets as unknown[]).filter(isValidAsset);
+  const assets = (raw.assets as unknown[])
+    .map(normalizeV2Asset)
+    .filter((a): a is Asset => a !== null);
   const nonFinancial = Array.isArray(raw.nonFinancialAssets)
     ? (raw.nonFinancialAssets as NonFinancialAsset[]).map((a) => ({
         ...a,
@@ -241,6 +262,13 @@ function readRaw(key: string): string | null {
   }
 }
 
+// Une quarantaine invisible vaut une donnee perdue : Thomas continuerait a
+// saisir sur un etat neuf sans savoir que son historique reel dort sous une
+// de ces deux cles.
+export function hasQuarantinedState(): boolean {
+  return readRaw(BROKEN_KEY) !== null || readRaw(BROKEN_LAST_KEY) !== null;
+}
+
 export function loadState(): AppState {
   // Chaque source a sa propre garde : un v3 corrompu ne doit pas empecher la
   // migration du v2, qui est peut-etre la derniere copie exploitable.
@@ -253,9 +281,15 @@ export function loadState(): AppState {
       // Un stockage corrompu ne doit jamais empecher l'application de demarrer.
     }
     // On n'ecrase jamais un contenu qu'on n'a pas su relire : il reste
-    // recuperable a la main sous cette cle.
+    // recuperable a la main sous cette cle. La premiere copie est la plus
+    // riche (une corruption suivante arrive sur un etat deja degrade), donc
+    // seule la derniere va sous une cle secondaire.
     try {
-      localStorage.setItem(BROKEN_KEY, raw);
+      if (readRaw(BROKEN_KEY) === null) {
+        localStorage.setItem(BROKEN_KEY, raw);
+      } else {
+        localStorage.setItem(BROKEN_LAST_KEY, raw);
+      }
     } catch {
       // Rien de mieux a faire si le stockage refuse aussi cette copie.
     }
