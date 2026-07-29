@@ -27,7 +27,12 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
   const [assetId, setAssetId] = useState(state.assets.find((a) => isFinancialCategory(a.category))?.id ?? '');
   const [label, setLabel] = useState('');
 
-  const placements = state.assets.filter((a) => isFinancialCategory(a.category));
+  const comptes = state.assets.filter((a) => isFinancialCategory(a.category));
+  // Le compte courant porte le quotidien : le preselectionner garde la depense
+  // a un seul geste tout en impactant le solde.
+  const compteParDefaut =
+    comptes.find((a) => a.category === 'Compte courant') ?? comptes.find((a) => a.category === 'Cash') ?? comptes[0];
+  const [compteId, setCompteId] = useState(compteParDefaut?.id ?? '');
   // Le clavier francais d'Android propose une virgule pour les decimales.
   const montant = Number(amount.replace(',', '.'));
   const valide = Number.isFinite(montant) && montant > 0 && isValidDateISO(date);
@@ -39,7 +44,12 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
       amount: montant,
       date,
       source: kind === 'revenu' ? source : undefined,
-      assetId: kind === 'investissement' ? assetId : undefined,
+      assetId:
+        kind === 'investissement'
+          ? assetId
+          : kind === 'depense' || kind === 'revenu'
+            ? compteId || undefined
+            : undefined,
       label: kind === 'revenu' || kind === 'actif' ? label || undefined : undefined,
     });
     onClose();
@@ -118,11 +128,42 @@ export function AddMovementSheet({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
+            {(kind === 'depense' || kind === 'revenu') && (
+              <div>
+                <Label className="text-xs">{kind === 'depense' ? 'Payé depuis' : 'Reçu sur'}</Label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  {comptes.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => setCompteId(a.id)}
+                      className={cn(
+                        'rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
+                        compteId === a.id ? 'border-primary bg-primary/10 text-primary' : 'border-border/60 text-muted-foreground'
+                      )}
+                    >
+                      {a.name}
+                    </button>
+                  ))}
+                  {/* Rattrapage de fin de mois : le solde a deja ete recale a la
+                      main, le mouvement ne doit alors compter que dans le bilan. */}
+                  <button
+                    onClick={() => setCompteId('')}
+                    className={cn(
+                      'rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
+                      compteId === '' ? 'border-primary bg-primary/10 text-primary' : 'border-border/60 text-muted-foreground'
+                    )}
+                  >
+                    Ne pas impacter
+                  </button>
+                </div>
+              </div>
+            )}
+
             {kind === 'investissement' && (
               <div>
                 <Label className="text-xs">Placement</Label>
                 <div className="mt-1 grid grid-cols-2 gap-2">
-                  {placements.map((a) => (
+                  {comptes.map((a) => (
                     <button
                       key={a.id}
                       onClick={() => setAssetId(a.id)}

@@ -45,6 +45,23 @@ describe('Mois', () => {
     expect(screen.queryByText('−200 €')).not.toBeInTheDocument();
   });
 
+  it('nomme le compte impute par une depense', () => {
+    seed({
+      assets: [{ id: 'cc', name: 'Compte courant', category: 'Compte courant', value: 500, target: 0, previousValue: 500 }],
+      movements: [mvt({ kind: 'depense', amount: 60, assetId: 'cc' })],
+    });
+    renderMois();
+
+    expect(screen.getByText(/15\/07\/2026 · Compte courant/)).toBeInTheDocument();
+  });
+
+  it('n affiche aucun compte quand la depense n en impute pas', () => {
+    seed({ movements: [mvt({ kind: 'depense', amount: 60 })] });
+    renderMois();
+
+    expect(screen.getByText('15/07/2026')).toBeInTheDocument();
+  });
+
   // Un versement deplace l argent vers un placement et fait monter la valeur
   // nette : le presenter comme une sortie induit en erreur.
   it('ne prefixe de moins que les depenses', () => {

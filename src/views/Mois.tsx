@@ -87,6 +87,12 @@ export function Mois() {
               // Seule une depense fait sortir l'argent : un versement le
               // deplace vers un placement et une acquisition cree un actif.
               const sortie = m.kind === 'depense';
+              // Le placement d'un versement est deja nomme par describe : ici
+              // c'est le compte d'ou l'argent sort ou sur lequel il arrive.
+              const compte =
+                m.kind === 'depense' || m.kind === 'revenu'
+                  ? state.assets.find((a) => a.id === m.assetId)
+                  : undefined;
               return (
                 <Card key={m.id} className="border-border/50 p-3.5">
                   <div className="flex items-center gap-3">
@@ -95,7 +101,10 @@ export function Mois() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{describe(m, state.assets)}</p>
-                      <p className="text-[11px] text-muted-foreground">{m.date.split('-').reverse().join('/')}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {m.date.split('-').reverse().join('/')}
+                        {compte && ` · ${compte.name}`}
+                      </p>
                     </div>
                     <span className={cn('text-sm font-semibold tabular-nums', positif ? 'text-primary' : 'text-foreground')}>
                       {positif ? '+' : sortie ? '−' : ''}{formatEuro(m.amount)}

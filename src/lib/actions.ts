@@ -1,4 +1,4 @@
-import type { AppState, Movement, MovementKind, IncomeSource } from './types';
+import type { AppState, Asset, Movement, MovementKind, IncomeSource } from './types';
 import { generateId } from './storage';
 import { netWorth, totalFinancialAssets, totalNonFinancialAssets } from './calc';
 import { movementsOfMonth, totalExpense, totalIncome, totalInvested } from './movements';
@@ -17,14 +17,25 @@ export function syncLowestNetWorth(state: AppState): AppState {
   return current < state.lowestNetWorth ? { ...state, lowestNetWorth: current } : state;
 }
 
+// Le sens dans lequel un mouvement deplace l'argent du compte qu'il impute.
+// Une acquisition d'actif ne rend rien : elle cree son propre bien.
+function assetDelta(kind: MovementKind, amount: number): number {
+  if (kind === 'depense') return -amount;
+  if (kind === 'revenu' || kind === 'investissement') return amount;
+  return 0;
+}
+
+function applyToAsset(assets: Asset[], assetId: string, delta: number): Asset[] {
+  return assets.map((a) => (a.id === assetId ? { ...a, value: a.value + delta } : a));
+}
+
 export function addMovement(state: AppState, draft: MovementDraft): AppState {
   const movement: Movement = { id: generateId(), ...draft };
   const next: AppState = { ...state };
 
-  if (draft.kind === 'investissement' && draft.assetId) {
-    next.assets = next.assets.map((a) =>
-      a.id === draft.assetId ? { ...a, value: a.value + draft.amount } : a
-    );
+  const delta = assetDelta(draft.kind, draft.amount);
+  if (delta !== 0 && draft.assetId) {
+    next.assets = applyToAsset(next.assets, draft.assetId, delta);
   }
 
   if (draft.kind === 'actif') {
@@ -49,10 +60,9 @@ export function deleteMovement(state: AppState, id: string): AppState {
 
   const next: AppState = { ...state, movements: state.movements.filter((m) => m.id !== id) };
 
-  if (movement.kind === 'investissement' && movement.assetId) {
-    next.assets = next.assets.map((a) =>
-      a.id === movement.assetId ? { ...a, value: a.value - movement.amount } : a
-    );
+  const delta = assetDelta(movement.kind, movement.amount);
+  if (delta !== 0 && movement.assetId) {
+    next.assets = applyToAsset(next.assets, movement.assetId, -delta);
   }
 
   if (movement.kind === 'actif' && movement.assetId) {
