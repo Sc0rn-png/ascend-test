@@ -1,15 +1,23 @@
-import type { AppState } from './types';
-import { DEFAULT_TARGET_ALLOCATION, DEFAULT_INVESTMENT_PLAN } from './types';
+import type { AppState, Asset, Movement, NonFinancialAsset } from './types';
+import {
+  ASSET_CATEGORIES,
+  DEFAULT_INVESTMENT_PLAN,
+  DEFAULT_TARGET_ALLOCATION,
+  MOVEMENT_KINDS,
+} from './types';
 
-const STORAGE_KEY = 'ascend_state_v2';
+const STORAGE_KEY = 'ascend_state_v3';
+const LEGACY_KEY = 'ascend_state_v2';
+const BROKEN_KEY = 'ascend_state_v3.broken';
+const BROKEN_LAST_KEY = 'ascend_state_v3.broken.last';
 
 export function generateId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }
 
-export function currentMonthKey(): string {
+export function todayISO(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function formatEuro(value: number): string {
@@ -20,111 +28,298 @@ export function formatEuro(value: number): string {
   }).format(Math.round(value));
 }
 
-export function formatEuroDetailed(value: number): string {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
 export function formatPercent(value: number): string {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(1)}%`;
 }
 
-function seedState(): AppState {
-  const target = new Date(2029, 11, 8);
+function defaultAsset(name: string, category: Asset['category']): Asset {
+  return { id: generateId(), name, category, value: 0, target: 0, previousValue: 0 };
+}
+
+export function emptyState(): AppState {
+  const inThreeYears = new Date();
+  inThreeYears.setFullYear(inThreeYears.getFullYear() + 3);
 
   return {
-    goal: 50000,
-    targetDate: target.toISOString(),
+    goal: 10000,
+    targetDate: `${inThreeYears.getFullYear()}-12-31`,
     assets: [
-      { id: generateId(), name: 'PEA', category: 'PEA', value: 700, target: 10000, previousValue: 700 },
-      { id: generateId(), name: 'CTO', category: 'CTO', value: 1300, target: 22500, previousValue: 1300 },
-      { id: generateId(), name: 'Bitcoin', category: 'Bitcoin', value: 140, target: 5000, previousValue: 140 },
-      { id: generateId(), name: 'Livret A', category: 'Livret A', value: 200, target: 5000, previousValue: 200 },
-      { id: generateId(), name: 'Cash', category: 'Cash', value: 0, target: 7500, previousValue: 0 },
-      { id: generateId(), name: 'Compte courant', category: 'Compte courant', value: 500, target: 2000, previousValue: 500 },
+      defaultAsset('PEA', 'PEA'),
+      defaultAsset('CTO', 'CTO'),
+      defaultAsset('Bitcoin', 'Bitcoin'),
+      defaultAsset('Livret A', 'Livret A'),
+      defaultAsset('Cash', 'Cash'),
+      defaultAsset('Compte courant', 'Compte courant'),
     ],
-    nonFinancialAssets: [
-      { id: generateId(), name: 'Collection One Piece', category: 'Collection', value: 600 },
-      { id: generateId(), name: 'Meubles / Appareils', category: 'Mobilier & Équipement', value: 1500 },
-    ],
+    nonFinancialAssets: [],
     includeNonFinancialInNetWorth: false,
-    incomes: [
-      { id: generateId(), name: 'Salaire fixe', amount: 1719 },
-      { id: generateId(), name: 'Tips (moyenne)', amount: 400 },
-      { id: generateId(), name: 'Business', amount: 0 },
-    ],
-    debts: [
-      { id: generateId(), name: 'Crédit conso', amount: 5000, previousAmount: 5000 },
-    ],
-    roadmap: [
-      { id: generateId(), label: 'Valeur nette', target: 2700, current: 2700, done: true, quarter: 'T3 2026' },
-      { id: generateId(), label: 'Premier investissement BTC', target: 1, current: 1, done: true, quarter: 'T3 2026' },
-      { id: generateId(), label: 'Valeur nette', target: 5000, current: 2700, done: false, quarter: 'T4 2026' },
-      { id: generateId(), label: 'Dette sous 3 000 €', target: 3000, current: 5000, done: false, quarter: 'T4 2026' },
-      { id: generateId(), label: 'Revenus business', target: 500, current: 0, done: false, quarter: 'T4 2026' },
-      { id: generateId(), label: 'Valeur nette', target: 10000, current: 2700, done: false, quarter: 'T1 2027' },
-      { id: generateId(), label: 'Patrimoine financier', target: 15000, current: 2840, done: false, quarter: 'T1 2027' },
-      { id: generateId(), label: 'Dette remboursée', target: 5000, current: 0, done: false, quarter: 'T2 2027' },
-      { id: generateId(), label: 'Valeur nette', target: 25000, current: 2700, done: false, quarter: 'T4 2027' },
-      { id: generateId(), label: 'Valeur nette', target: 50000, current: 2700, done: false, quarter: 'T4 2029' },
-    ],
-    business: {
-      ca: 0,
-      profit: 0,
-      adSpend: 0,
-      orders: 0,
-      avgBasket: 0,
-      conversion: 0,
-      treasury: 0,
-      previousCa: 0,
-    },
+    movements: [],
+    debtTotal: 0,
+    previousDebtTotal: 0,
+    lowestNetWorth: 0,
     investmentPlan: DEFAULT_INVESTMENT_PLAN,
     targetAllocation: DEFAULT_TARGET_ALLOCATION,
     snapshots: [],
-    achievements: [
-      { id: generateId(), label: 'Premier investissement', description: 'Atteindre 1 000 € de patrimoine financier investi', threshold: 1000, metric: 'firstInvestment', unlocked: false },
-      { id: generateId(), label: 'Patrimoine 5 000 €', description: 'Valeur nette de 5 000 €', threshold: 5000, metric: 'netWorth', unlocked: false },
-      { id: generateId(), label: 'Patrimoine 10 000 €', description: 'Valeur nette de 10 000 €', threshold: 10000, metric: 'netWorth', unlocked: false },
-      { id: generateId(), label: 'Patrimoine 25 000 €', description: 'Valeur nette de 25 000 €', threshold: 25000, metric: 'netWorth', unlocked: false },
-      { id: generateId(), label: 'Patrimoine 100 000 €', description: 'Valeur nette de 100 000 €', threshold: 100000, metric: 'patrimoine', unlocked: false },
-      { id: generateId(), label: 'Dette remboursée', description: 'Solde toutes tes dettes', threshold: 0, metric: 'debtCleared', unlocked: false },
-      { id: generateId(), label: 'Business 1 000 €/mois', description: 'Revenu business mensuel de 1 000 €', threshold: 1000, metric: 'businessIncome', unlocked: false },
-      { id: generateId(), label: 'Business 5 000 €/mois', description: 'Revenu business mensuel de 5 000 €', threshold: 5000, metric: 'businessIncome', unlocked: false },
-    ],
     theme: 'dark',
     lastUpdateMonth: null,
   };
 }
 
-export function loadState(): AppState {
+function asset(name: string, category: Asset['category'], value: number, target: number): Asset {
+  return { id: generateId(), name, category, value, target, previousValue: value };
+}
+
+// Etat de depart d'une installation neuve : la situation que Thomas avait deja
+// saisie. `emptyState` reste neutre car il sert de base de fusion a l'import,
+// ou completer les champs absents avec des chiffres reels serait faux.
+export function seedState(): AppState {
+  const assets = [
+    asset('PEA', 'PEA', 700, 10000),
+    asset('CTO', 'CTO', 1300, 22500),
+    asset('Bitcoin', 'Bitcoin', 140, 5000),
+    asset('Livret A', 'Livret A', 200, 5000),
+    asset('Cash', 'Cash', 0, 7500),
+    asset('Compte courant', 'Compte courant', 500, 2000),
+  ];
+  const debtTotal = 5000;
+  const patrimoine = assets.reduce((sum, a) => sum + a.value, 0);
+
+  return {
+    ...emptyState(),
+    goal: 50000,
+    targetDate: '2029-12-08',
+    assets,
+    nonFinancialAssets: [
+      { id: generateId(), name: 'Collection One Piece', category: 'Collection', value: 600, previousValue: 600 },
+      { id: generateId(), name: 'Meubles / Appareils', category: 'Mobilier & Équipement', value: 1500, previousValue: 1500 },
+    ],
+    debtTotal,
+    previousDebtTotal: debtTotal,
+    lowestNetWorth: patrimoine - debtTotal,
+    investmentPlan: { PEA: 250, CTO: 200, Bitcoin: 50, LivretA: 100 },
+  };
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
+function isValidArray<T>(v: unknown, predicate: (item: unknown) => item is T): v is T[] {
+  return Array.isArray(v) && v.every(predicate);
+}
+
+function isValidMovement(v: unknown): v is Movement {
+  if (!isRecord(v)) return false;
+  // Hors format, monthKeyOf ne rend aucun mois : le mouvement n'apparait dans
+  // aucune liste et devient impossible a supprimer.
+  if (typeof v.id !== 'string' || !isValidDateISO(v.date)) return false;
+  if (!isFiniteNumber(v.amount)) return false;
+  return MOVEMENT_KINDS.includes(v.kind as Movement['kind']);
+}
+
+function isValidAsset(v: unknown): v is Asset {
+  if (!isRecord(v)) return false;
+  if (typeof v.id !== 'string' || typeof v.name !== 'string') return false;
+  if (!isFiniteNumber(v.value) || !isFiniteNumber(v.previousValue) || !isFiniteNumber(v.target)) return false;
+  return ASSET_CATEGORIES.includes(v.category as Asset['category']);
+}
+
+// Un actif v2 sans previousValue ni target n'est pas corrompu : le v2 ne
+// portait pas forcement ces deux champs. On le repare au lieu de le rejeter,
+// pour ne pas faire disparaitre un placement reel de la valeur nette migree.
+function normalizeV2Asset(v: unknown): Asset | null {
+  if (!isRecord(v)) return null;
+  if (typeof v.id !== 'string' || typeof v.name !== 'string') return null;
+  if (!isFiniteNumber(v.value)) return null;
+  if (!ASSET_CATEGORIES.includes(v.category as Asset['category'])) return null;
+  return {
+    id: v.id,
+    name: v.name,
+    category: v.category as Asset['category'],
+    value: v.value,
+    previousValue: isFiniteNumber(v.previousValue) ? v.previousValue : v.value,
+    target: isFiniteNumber(v.target) ? v.target : 0,
+  };
+}
+
+function isValidNonFinancialAsset(v: unknown): v is NonFinancialAsset {
+  if (!isRecord(v)) return false;
+  if (typeof v.id !== 'string' || typeof v.name !== 'string') return false;
+  if (typeof v.category !== 'string') return false;
+  if (!isFiniteNumber(v.value) || !isFiniteNumber(v.previousValue)) return false;
+  return true;
+}
+
+function isValidSnapshot(v: unknown): v is { id: string; netWorth: number; financialPatrimoine: number; nonFinancialPatrimoine: number; debtTotal: number; encaisse: number; depense: number; investi: number } {
+  if (!isRecord(v)) return false;
+  if (typeof v.id !== 'string') return false;
+  return (
+    isFiniteNumber(v.netWorth) &&
+    isFiniteNumber(v.financialPatrimoine) &&
+    isFiniteNumber(v.nonFinancialPatrimoine) &&
+    isFiniteNumber(v.debtTotal) &&
+    isFiniteNumber(v.encaisse) &&
+    isFiniteNumber(v.depense) &&
+    isFiniteNumber(v.investi)
+  );
+}
+
+function isValidNumberRecord(v: unknown): boolean {
+  if (!isRecord(v)) return false;
+  return Object.values(v).every(isFiniteNumber);
+}
+
+export function isValidDateISO(v: unknown): v is string {
+  if (typeof v !== 'string') return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(v);
+}
+
+function isValidMonthISO(v: unknown): v is string {
+  if (typeof v !== 'string') return false;
+  const match = /^(\d{4})-(\d{2})$/.exec(v);
+  if (!match) return false;
+  const month = parseInt(match[2], 10);
+  return month >= 1 && month <= 12;
+}
+
+export function validateState(raw: unknown): AppState | null {
+  if (!isRecord(raw)) return null;
+
+  // `assets` est le champ discriminant : sans lui, n'importe quel objet JSON
+  // passerait pour un export ASCEND et remplacerait tout l'etat.
+  if (!isValidArray(raw.assets, isValidAsset)) return null;
+
+  if (raw.movements !== undefined) {
+    if (!isValidArray(raw.movements, isValidMovement)) return null;
+  }
+  if (raw.nonFinancialAssets !== undefined) {
+    if (!isValidArray(raw.nonFinancialAssets, isValidNonFinancialAsset)) return null;
+  }
+  if (raw.snapshots !== undefined) {
+    if (!isValidArray(raw.snapshots, isValidSnapshot)) return null;
+  }
+  if (raw.goal !== undefined && !isFiniteNumber(raw.goal)) return null;
+  if (raw.debtTotal !== undefined && !isFiniteNumber(raw.debtTotal)) return null;
+  if (raw.previousDebtTotal !== undefined && !isFiniteNumber(raw.previousDebtTotal)) return null;
+  if (raw.lowestNetWorth !== undefined && !isFiniteNumber(raw.lowestNetWorth)) return null;
+  if (raw.targetDate !== undefined && !isValidDateISO(raw.targetDate)) return null;
+  if (raw.theme !== undefined && raw.theme !== 'dark' && raw.theme !== 'light') return null;
+  if (raw.lastUpdateMonth !== undefined && raw.lastUpdateMonth !== null && !isValidMonthISO(raw.lastUpdateMonth)) return null;
+  if (raw.includeNonFinancialInNetWorth !== undefined && typeof raw.includeNonFinancialInNetWorth !== 'boolean') return null;
+  if (raw.investmentPlan !== undefined && !isValidNumberRecord(raw.investmentPlan)) return null;
+  if (raw.targetAllocation !== undefined && !isValidNumberRecord(raw.targetAllocation)) return null;
+
+  const base = emptyState();
+  return {
+    ...base,
+    ...(raw as Partial<AppState>),
+    investmentPlan: { ...base.investmentPlan, ...(raw.investmentPlan as object) },
+    targetAllocation: { ...base.targetAllocation, ...(raw.targetAllocation as object) },
+  };
+}
+
+export function migrateV2(raw: unknown): AppState | null {
+  if (!isRecord(raw) || !Array.isArray(raw.assets)) return null;
+
+  const base = emptyState();
+  const debts = Array.isArray(raw.debts) ? (raw.debts as Record<string, number>[]) : [];
+
+  const assets = (raw.assets as unknown[])
+    .map(normalizeV2Asset)
+    .filter((a): a is Asset => a !== null);
+  const nonFinancial = Array.isArray(raw.nonFinancialAssets)
+    ? (raw.nonFinancialAssets as NonFinancialAsset[]).map((a) => ({
+        ...a,
+        previousValue: a.value,
+      }))
+    : [];
+
+  return {
+    ...base,
+    goal: typeof raw.goal === 'number' ? raw.goal : base.goal,
+    targetDate: typeof raw.targetDate === 'string' ? raw.targetDate.slice(0, 10) : base.targetDate,
+    assets,
+    nonFinancialAssets: nonFinancial,
+    includeNonFinancialInNetWorth: raw.includeNonFinancialInNetWorth === true,
+    debtTotal: debts.reduce((sum, d) => sum + (d.amount ?? 0), 0),
+    previousDebtTotal: debts.reduce((sum, d) => sum + (d.previousAmount ?? d.amount ?? 0), 0),
+    investmentPlan: { ...base.investmentPlan, ...(raw.investmentPlan as object) },
+    targetAllocation: { ...base.targetAllocation, ...(raw.targetAllocation as object) },
+    theme: raw.theme === 'light' ? 'light' : 'dark',
+  };
+}
+
+function readRaw(key: string): string | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const seeded = seedState();
-      saveState(seeded);
-      return seeded;
-    }
-    const parsed = JSON.parse(raw) as Partial<AppState>;
-    const seeded = seedState();
-    const merged: AppState = {
-      ...seeded,
-      ...parsed,
-      targetAllocation: { ...seeded.targetAllocation, ...parsed.targetAllocation },
-      investmentPlan: { ...seeded.investmentPlan, ...parsed.investmentPlan },
-      business: { ...seeded.business, ...parsed.business },
-    };
-    return merged;
+    return localStorage.getItem(key);
   } catch {
-    return seedState();
+    return null;
   }
 }
 
+// Une quarantaine invisible vaut une donnee perdue : Thomas continuerait a
+// saisir sur un etat neuf sans savoir que son historique reel dort sous une
+// de ces deux cles.
+export function hasQuarantinedState(): boolean {
+  return readRaw(BROKEN_KEY) !== null || readRaw(BROKEN_LAST_KEY) !== null;
+}
+
+export function loadState(): AppState {
+  // Chaque source a sa propre garde : un v3 corrompu ne doit pas empecher la
+  // migration du v2, qui est peut-etre la derniere copie exploitable.
+  const raw = readRaw(STORAGE_KEY);
+  if (raw) {
+    try {
+      const parsed = validateState(JSON.parse(raw));
+      if (parsed) return parsed;
+    } catch {
+      // Un stockage corrompu ne doit jamais empecher l'application de demarrer.
+    }
+    // On n'ecrase jamais un contenu qu'on n'a pas su relire : il reste
+    // recuperable a la main sous cette cle. La premiere copie est la plus
+    // riche (une corruption suivante arrive sur un etat deja degrade), donc
+    // seule la derniere va sous une cle secondaire.
+    try {
+      if (readRaw(BROKEN_KEY) === null) {
+        localStorage.setItem(BROKEN_KEY, raw);
+      } else {
+        localStorage.setItem(BROKEN_LAST_KEY, raw);
+      }
+    } catch {
+      // Rien de mieux a faire si le stockage refuse aussi cette copie.
+    }
+  }
+
+  const legacy = readRaw(LEGACY_KEY);
+  if (legacy) {
+    try {
+      const migrated = migrateV2(JSON.parse(legacy));
+      if (migrated) {
+        saveState(migrated);
+        return migrated;
+      }
+    } catch {
+      // Idem : un v2 illisible laisse simplement repartir sur un etat neutre.
+    }
+  }
+
+  const fresh = seedState();
+  saveState(fresh);
+  return fresh;
+}
+
 export function saveState(state: AppState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Quota atteint ou stockage refuse : l'echec d'une ecriture ne doit pas
+    // remonter jusqu'a l'ErrorBoundary, que le rechargement ne quitterait plus.
+  }
 }
 
 export function exportState(state: AppState): void {
@@ -132,7 +327,7 @@ export function exportState(state: AppState): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `ascend-export-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `ascend-export-${todayISO()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -142,10 +337,14 @@ export function importState(file: File): Promise<AppState> {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const parsed = JSON.parse(reader.result as string) as AppState;
+        const parsed = validateState(JSON.parse(reader.result as string));
+        if (!parsed) {
+          reject(new Error('Ce fichier ne contient pas des données ASCEND valides'));
+          return;
+        }
         resolve(parsed);
       } catch {
-        reject(new Error('Fichier invalide'));
+        reject(new Error('Fichier illisible'));
       }
     };
     reader.onerror = () => reject(new Error('Lecture impossible'));

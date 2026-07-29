@@ -4,8 +4,8 @@ import { Plus, TrendingUp, TrendingDown, Pencil, Trash2, X, Sofa, Coins } from '
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import { useStore } from '@/lib/store';
 import { formatEuro, generateId, formatPercent } from '@/lib/storage';
-import { actualAllocation, allocationColor, monthLabel, totalNonFinancialAssets } from '@/lib/calc';
-import { ASSET_CATEGORIES, FINANCIAL_CATEGORIES, isFinancialCategory, type Asset, type AssetCategory, type NonFinancialAsset } from '@/lib/types';
+import { actualAllocation, allocationColor, monthLabel, netWorth, totalFinancialAssets, totalNonFinancialAssets } from '@/lib/calc';
+import { ASSET_CATEGORIES, isFinancialCategory, type Asset, type AssetCategory, type NonFinancialAsset } from '@/lib/types';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { ProgressBar } from '@/components/ProgressBar';
 import { Card } from '@/components/ui/card';
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 const ease = [0.16, 1, 0.3, 1] as const;
 
 export function Patrimoine() {
-  const { state, setState } = useStore();
+  const { state, setState, setDebtTotal } = useStore();
   const [editing, setEditing] = useState<Asset | null>(null);
   const [adding, setAdding] = useState(false);
   const [editingNF, setEditingNF] = useState<NonFinancialAsset | null>(null);
@@ -28,17 +28,20 @@ export function Patrimoine() {
 
   const historyData = state.snapshots.length > 0
     ? state.snapshots.map((s) => ({
-        label: monthLabel(s.date),
+        label: monthLabel(s.id),
         net: s.netWorth,
         financial: s.financialPatrimoine,
         nonFinancial: s.nonFinancialPatrimoine,
       }))
-    : [{ label: 'Maintenant', net: state.assets.reduce((sum, a) => sum + a.value, 0) - state.debts.reduce((s, d) => s + d.amount, 0), financial: state.assets.filter((a) => isFinancialCategory(a.category)).reduce((s, a) => s + a.value, 0), nonFinancial: totalNonFinancialAssets(state) }];
+    : [{ label: 'Maintenant', net: netWorth(state), financial: totalFinancialAssets(state), nonFinancial: totalNonFinancialAssets(state) }];
 
-  const totalFinancial = state.assets.filter((a) => isFinancialCategory(a.category)).reduce((sum, a) => sum + a.value, 0);
+  const totalFinancial = totalFinancialAssets(state);
   const totalNonFinancial = totalNonFinancialAssets(state);
 
   const removeAsset = (id: string) => {
+    const asset = state.assets.find((a) => a.id === id);
+    if (!asset) return;
+    if (!window.confirm(`Supprimer « ${asset.name} » et sa valeur de ${formatEuro(asset.value)} ?`)) return;
     setState((prev) => ({ ...prev, assets: prev.assets.filter((a) => a.id !== id) }));
   };
 
@@ -55,6 +58,9 @@ export function Patrimoine() {
   };
 
   const removeNFAsset = (id: string) => {
+    const asset = state.nonFinancialAssets.find((a) => a.id === id);
+    if (!asset) return;
+    if (!window.confirm(`Supprimer « ${asset.name} » ?`)) return;
     setState((prev) => ({ ...prev, nonFinancialAssets: prev.nonFinancialAssets.filter((a) => a.id !== id) }));
   };
 
@@ -91,6 +97,25 @@ export function Patrimoine() {
               <span className="font-semibold tabular-nums">{formatEuro(totalFinancial + totalNonFinancial)}</span>
             </div>
           </div>
+        </Card>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.03, ease }}>
+        <Card className="border-border/50 p-6">
+          <Label htmlFor="dette" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Dette totale restante
+          </Label>
+          <Input
+            id="dette"
+            type="number"
+            inputMode="decimal"
+            value={state.debtTotal}
+            onChange={(e) => setDebtTotal(Number(e.target.value) || 0)}
+            className="mt-2 text-xl font-semibold"
+          />
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Le total restant sur l'ensemble de tes crédits.
+          </p>
         </Card>
       </motion.div>
 
@@ -289,7 +314,9 @@ function AssetEditor({ asset, onSave, onClose }: { asset: Asset | null; onSave: 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={onClose}>
+    // Au-dessus de la barre de navigation (z-50), qui recouvrirait sinon le
+    // bouton d'enregistrement sur mobile.
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.3, ease }} className="w-full max-w-md rounded-t-3xl border border-border/60 bg-card p-6 pb-8 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold">{asset ? 'Modifier l\'actif' : 'Nouvel actif'}</h3>
@@ -337,11 +364,14 @@ function NonFinancialEditor({ asset, onSave, onClose }: { asset: NonFinancialAss
       name: name || 'Nouvel actif',
       category: category || 'Divers',
       value: Number(value) || 0,
+      previousValue: (asset?.previousValue ?? Number(value)) || 0,
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={onClose}>
+    // Au-dessus de la barre de navigation (z-50), qui recouvrirait sinon le
+    // bouton d'enregistrement sur mobile.
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.3, ease }} className="w-full max-w-md rounded-t-3xl border border-border/60 bg-card p-6 pb-8 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold">{asset ? 'Modifier l\'actif' : 'Nouvel actif non financier'}</h3>

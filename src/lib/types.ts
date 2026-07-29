@@ -44,42 +44,39 @@ export interface NonFinancialAsset {
   name: string;
   category: string;
   value: number;
+  previousValue: number;
 }
 
-export interface IncomeSource {
+export type MovementKind = 'revenu' | 'depense' | 'investissement' | 'actif';
+
+export const MOVEMENT_KINDS: MovementKind[] = ['revenu', 'depense', 'investissement', 'actif'];
+
+export type IncomeSource = 'Salaire' | 'Tips' | 'Business' | 'Exceptionnel';
+
+export const INCOME_SOURCES: IncomeSource[] = ['Salaire', 'Tips', 'Business', 'Exceptionnel'];
+
+// `assetId` designe le placement credite pour un investissement, et l'actif non
+// financier cree pour un mouvement de type 'actif' — c'est ce qui rend la
+// suppression d'un mouvement reversible dans les deux cas.
+export interface Movement {
   id: string;
-  name: string;
+  date: string; // 'YYYY-MM-DD'
+  kind: MovementKind;
   amount: number;
+  source?: IncomeSource;
+  assetId?: string;
+  label?: string;
 }
 
-export interface Debt {
-  id: string;
-  name: string;
-  amount: number;
-  previousAmount: number;
-}
-
-// Feuille de route ajustée (Objectifs par Année/Trimestre)
-export interface RoadmapGoal {
-  id: string;
-  label: string;
-  target: number;
-  current: number;
-  done: boolean;
-  quarter: string; // Ex: '2026', '2027' ou 'T3 2026'
-}
-
-// Business Metrics - L'Étendard (Aujourd'hui & Demain)
-export interface BusinessMetrics {
-  ca: number;
-  profit: number;
-  adSpend: number;
-  orders: number;
-  avgBasket: number;
-  conversion: number;
-  treasury: number;
-  previousCa: number;
-  targetMonthlyIncome: number; // Objectif Ex: 1 000 €/mois
+export interface Snapshot {
+  id: string; // cle du mois, ex. '2026-08'
+  netWorth: number;
+  financialPatrimoine: number;
+  nonFinancialPatrimoine: number;
+  debtTotal: number;
+  encaisse: number;
+  depense: number;
+  investi: number;
 }
 
 export interface InvestmentPlan {
@@ -97,56 +94,19 @@ export interface TargetAllocation {
   Cash: number;
 }
 
-// Snapshot mensuel complet pour les graphiques & rapports auto
-export interface Snapshot {
-  id: string; // '2026-08'
-  date: string;
-  netWorth: number;
-  financialPatrimoine: number;
-  nonFinancialPatrimoine: number;
-  assets: { name: string; category: AssetCategory; value: number }[];
-  nonFinancialAssets: { name: string; category: string; value: number }[];
-  debt: number;
-  income: number;
-  businessCa: number;
-  businessProfit: number;
-}
-
-// Gamification / Succès
-export interface Achievement {
-  id: string;
-  label: string;
-  description: string;
-  threshold: number;
-  metric: 'netWorth' | 'firstInvestment' | 'debtCleared' | 'businessIncome' | 'patrimoine';
-  unlocked: boolean;
-}
-
-// Calculs statistiques automatiques (Phase 1 & Phase 5)
-export interface PerformanceStats {
-  monthlyProgress: number;          // + € du mois
-  progressFromJanuary: number;      // + € depuis Janvier
-  historicalRecord: number;         // Record net worth atteint
-  remainingCapitalToBuild: number;  // Capital restant avant objectif final
-  estimatedTargetDate: string;      // Date estimée d'atteinte de l'objectif
-  patrimoineCreatedTotal: number;   // Patrimoine créé depuis le lancement
-  averageCapitalPerMonth: number;   // Capital moyen créé / mois
-}
-
 export interface AppState {
-  goal: number; // Ex: 50 000 €
-  targetDate: string; // Ex: '2029-12-08'
+  goal: number;
+  targetDate: string; // 'YYYY-MM-DD'
   assets: Asset[];
   nonFinancialAssets: NonFinancialAsset[];
   includeNonFinancialInNetWorth: boolean;
-  incomes: IncomeSource[];
-  debts: Debt[];
-  roadmap: RoadmapGoal[];
-  business: BusinessMetrics;
+  movements: Movement[];
+  debtTotal: number;
+  previousDebtTotal: number;
+  lowestNetWorth: number;
   investmentPlan: InvestmentPlan;
   targetAllocation: TargetAllocation;
   snapshots: Snapshot[];
-  achievements: Achievement[];
   theme: 'dark' | 'light';
   lastUpdateMonth: string | null;
 }
@@ -160,8 +120,8 @@ export const DEFAULT_TARGET_ALLOCATION: TargetAllocation = {
 };
 
 export const DEFAULT_INVESTMENT_PLAN: InvestmentPlan = {
-  PEA: 250,
-  CTO: 200,
-  Bitcoin: 50,
-  LivretA: 100,
+  PEA: 0,
+  CTO: 0,
+  Bitcoin: 0,
+  LivretA: 0,
 };

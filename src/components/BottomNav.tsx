@@ -1,14 +1,13 @@
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Map, Wallet, Briefcase, Settings } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type TabId = 'dashboard' | 'roadmap' | 'patrimoine' | 'business' | 'settings';
+export type TabId = 'dashboard' | 'mois' | 'patrimoine' | 'settings';
 
 const TABS: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'roadmap', label: 'Roadmap', icon: Map },
+  { id: 'mois', label: 'Mois', icon: CalendarDays },
   { id: 'patrimoine', label: 'Patrimoine', icon: Wallet },
-  { id: 'business', label: 'Business', icon: Briefcase },
   { id: 'settings', label: 'Réglages', icon: Settings },
 ];
 
@@ -21,7 +20,7 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto max-w-md px-4 pb-3">
-        <div className="glass flex items-center justify-around rounded-2xl border border-border/60 px-1.5 py-1.5 shadow-2xl">
+        <div className="flex items-center justify-around rounded-2xl border border-border/60 bg-card/95 px-1.5 py-1.5 shadow-2xl">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = active === tab.id;
