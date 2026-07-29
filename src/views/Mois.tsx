@@ -30,6 +30,16 @@ function describe(m: Movement, assets: Asset[]): string {
   return m.label ?? 'Actif';
 }
 
+// Le placement vise par un versement est deja nomme par describe : le compte
+// qui l'a finance se distingue donc par « depuis ».
+function compteImpute(m: Movement, assets: Asset[]): string | undefined {
+  if (m.kind === 'depense' || m.kind === 'revenu') {
+    return assets.find((a) => a.id === m.assetId)?.name;
+  }
+  const source = assets.find((a) => a.id === m.fromAssetId);
+  return source && `depuis ${source.name}`;
+}
+
 export function Mois() {
   const { state, deleteMovement } = useStore();
   const key = currentMonthKey();
@@ -87,6 +97,7 @@ export function Mois() {
               // Seule une depense fait sortir l'argent : un versement le
               // deplace vers un placement et une acquisition cree un actif.
               const sortie = m.kind === 'depense';
+              const compte = compteImpute(m, state.assets);
               return (
                 <Card key={m.id} className="border-border/50 p-3.5">
                   <div className="flex items-center gap-3">
@@ -95,7 +106,10 @@ export function Mois() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{describe(m, state.assets)}</p>
-                      <p className="text-[11px] text-muted-foreground">{m.date.split('-').reverse().join('/')}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {m.date.split('-').reverse().join('/')}
+                        {compte && ` · ${compte}`}
+                      </p>
                     </div>
                     <span className={cn('text-sm font-semibold tabular-nums', positif ? 'text-primary' : 'text-foreground')}>
                       {positif ? '+' : sortie ? '−' : ''}{formatEuro(m.amount)}

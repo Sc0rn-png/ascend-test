@@ -34,8 +34,67 @@ describe('addMovement', () => {
     expect(s.assets.find((a) => a.id === 'pea')!.value).toBe(700);
   });
 
-  it('ne touche a aucun solde pour une depense', () => {
+  it('ne touche a aucun solde pour une depense sans compte', () => {
     const s = addMovement(withCto(), { kind: 'depense', amount: 200, date: '2026-07-25' });
+    expect(s.assets.find((a) => a.id === 'cto')!.value).toBe(1300);
+  });
+
+  it('debite le compte impute par une depense', () => {
+    const s = addMovement(withCto(), { kind: 'depense', amount: 200, date: '2026-07-25', assetId: 'cto' });
+    expect(s.assets.find((a) => a.id === 'cto')!.value).toBe(1100);
+    expect(s.assets.find((a) => a.id === 'pea')!.value).toBe(700);
+  });
+
+  // Le manque signale par Thomas : sans imputation, une depense laissait la
+  // valeur nette immobile alors que son compte courant est un actif suivi.
+  it('fait baisser la valeur nette d une depense imputee', () => {
+    const avant = netWorth(withCto());
+    const s = addMovement(withCto(), { kind: 'depense', amount: 200, date: '2026-07-25', assetId: 'cto' });
+    expect(netWorth(s)).toBe(avant - 200);
+  });
+
+  it('credite le compte impute par une rentree', () => {
+    const s = addMovement(withCto(), { kind: 'revenu', amount: 400, date: '2026-07-25', source: 'Tips', assetId: 'cto' });
+    expect(s.assets.find((a) => a.id === 'cto')!.value).toBe(1700);
+    expect(s.assets.find((a) => a.id === 'pea')!.value).toBe(700);
+  });
+
+  it('ne touche a aucun solde pour une rentree sans compte', () => {
+    const s = addMovement(withCto(), { kind: 'revenu', amount: 400, date: '2026-07-25', source: 'Tips' });
+    expect(s.assets.find((a) => a.id === 'cto')!.value).toBe(1300);
+  });
+
+  it('debite le compte qui finance un versement', () => {
+    const s = addMovement(withCto(), { kind: 'investissement', amount: 200, date: '2026-07-25', assetId: 'cto', fromAssetId: 'pea' });
+    expect(s.assets.find((a) => a.id === 'cto')!.value).toBe(1500);
+    expect(s.assets.find((a) => a.id === 'pea')!.value).toBe(500);
+  });
+
+  // Un virement interne ne cree pas de richesse : l'argent change de poche.
+  it('laisse la valeur nette immobile quand le versement vient d un compte suivi', () => {
+    const avant = netWorth(withCto());
+    const s = addMovement(withCto(), { kind: 'investissement', amount: 200, date: '2026-07-25', assetId: 'cto', fromAssetId: 'pea' });
+    expect(netWorth(s)).toBe(avant);
+  });
+
+  // Sans compte source, l'argent vient de l'exterieur : la valeur nette monte.
+  it('fait monter la valeur nette d un versement sans compte source', () => {
+    const avant = netWorth(withCto());
+    const s = addMovement(withCto(), { kind: 'investissement', amount: 200, date: '2026-07-25', assetId: 'cto' });
+    expect(netWorth(s)).toBe(avant + 200);
+  });
+
+  it('debite le compte qui finance un actif sans toucher a l actif cree', () => {
+    const s = addMovement(withCto(), { kind: 'actif', amount: 450, date: '2026-07-25', label: 'Bureau', fromAssetId: 'cto' });
+    expect(s.assets.find((a) => a.id === 'cto')!.value).toBe(850);
+    expect(s.nonFinancialAssets).toHaveLength(1);
+    expect(s.nonFinancialAssets[0].value).toBe(450);
+  });
+
+  // Un compte efface depuis la saisie ne doit pas faire echouer l enregistrement.
+  it('inscrit le mouvement meme si le compte impute n existe plus', () => {
+    const s = addMovement(withCto(), { kind: 'depense', amount: 200, date: '2026-07-25', assetId: 'disparu' });
+    expect(s.movements).toHaveLength(1);
     expect(s.assets.find((a) => a.id === 'cto')!.value).toBe(1300);
   });
 
@@ -67,6 +126,33 @@ describe('deleteMovement', () => {
     const next = deleteMovement(s, s.movements[0].id);
     expect(next.assets.find((a) => a.id === 'cto')!.value).toBe(1300);
     expect(next.assets.find((a) => a.id === 'pea')!.value).toBe(700);
+  });
+
+  it('rend l argent au compte d une depense supprimee', () => {
+    const s = addMovement(withCto(), { kind: 'depense', amount: 200, date: '2026-07-25', assetId: 'cto' });
+    const next = deleteMovement(s, s.movements[0].id);
+    expect(next.assets.find((a) => a.id === 'cto')!.value).toBe(1300);
+    expect(next.assets.find((a) => a.id === 'pea')!.value).toBe(700);
+  });
+
+  it('rend l argent au compte qui finançait un versement supprime', () => {
+    const s = addMovement(withCto(), { kind: 'investissement', amount: 200, date: '2026-07-25', assetId: 'cto', fromAssetId: 'pea' });
+    const next = deleteMovement(s, s.movements[0].id);
+    expect(next.assets.find((a) => a.id === 'cto')!.value).toBe(1300);
+    expect(next.assets.find((a) => a.id === 'pea')!.value).toBe(700);
+  });
+
+  it('rend l argent au compte qui finançait un actif supprime', () => {
+    const s = addMovement(withCto(), { kind: 'actif', amount: 450, date: '2026-07-25', label: 'Bureau', fromAssetId: 'cto' });
+    const next = deleteMovement(s, s.movements[0].id);
+    expect(next.assets.find((a) => a.id === 'cto')!.value).toBe(1300);
+    expect(next.nonFinancialAssets).toHaveLength(0);
+  });
+
+  it('reprend l argent au compte d une rentree supprimee', () => {
+    const s = addMovement(withCto(), { kind: 'revenu', amount: 400, date: '2026-07-25', source: 'Tips', assetId: 'cto' });
+    const next = deleteMovement(s, s.movements[0].id);
+    expect(next.assets.find((a) => a.id === 'cto')!.value).toBe(1300);
   });
 
   it('retire l actif non financier materialise', () => {

@@ -55,9 +55,12 @@ export type IncomeSource = 'Salaire' | 'Tips' | 'Business' | 'Exceptionnel';
 
 export const INCOME_SOURCES: IncomeSource[] = ['Salaire', 'Tips', 'Business', 'Exceptionnel'];
 
-// `assetId` designe le placement credite pour un investissement, et l'actif non
-// financier cree pour un mouvement de type 'actif' — c'est ce qui rend la
-// suppression d'un mouvement reversible dans les deux cas.
+// `assetId` designe l'actif que le mouvement fait bouger dans son sens naturel :
+// le compte debite par une depense, credite par une rentree, le placement
+// credite par un versement, l'actif non financier cree par une acquisition —
+// c'est ce qui rend la suppression d'un mouvement reversible dans tous les cas.
+// `fromAssetId` nomme le compte qui a finance le mouvement quand il differe de
+// `assetId` : sans lui, un virement interne gonflerait la valeur nette.
 export interface Movement {
   id: string;
   date: string; // 'YYYY-MM-DD'
@@ -65,6 +68,7 @@ export interface Movement {
   amount: number;
   source?: IncomeSource;
   assetId?: string;
+  fromAssetId?: string;
   label?: string;
 }
 
