@@ -1,9 +1,25 @@
-import { describe, it, expect } from 'vitest';
-import { validateState, migrateV2, emptyState, formatEuro } from './storage';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { validateState, migrateV2, emptyState, formatEuro, loadState, saveState } from './storage';
 
 describe('validateState', () => {
   it('rejette un objet vide', () => {
     expect(validateState({})).toBeNull();
+  });
+
+  // Sans champ discriminant, n importe quel JSON passait pour un export ASCEND
+  // et remplacait tout l etat en annoncant un import reussi.
+  it('rejette un JSON quelconque sans placements', () => {
+    expect(validateState({ name: 'x' })).toBeNull();
+  });
+
+  it('accepte un export bien forme', () => {
+    const exporte = {
+      ...emptyState(),
+      goal: 50000,
+      assets: [{ id: 'a', name: 'PEA', category: 'PEA', value: 700, target: 10000, previousValue: 700 }],
+      movements: [{ id: 'm', date: '2026-07-15', kind: 'depense', amount: 60 }],
+    };
+    expect(validateState(exporte)?.goal).toBe(50000);
   });
 
   it('rejette un tableau', () => {
@@ -23,6 +39,18 @@ describe('validateState', () => {
 
   it('accepte un état neutre', () => {
     expect(validateState(emptyState())).not.toBeNull();
+  });
+
+  // Sans previousValue, previousNetWorth renvoie NaN et le Dashboard affiche
+  // « NaN € » sans que rien n ait signale l actif fautif.
+  it('rejette un placement sans previousValue', () => {
+    const bad = { ...emptyState(), assets: [{ id: 'a', name: 'PEA', category: 'PEA', value: 700, target: 0 }] };
+    expect(validateState(bad)).toBeNull();
+  });
+
+  it('rejette un placement sans objectif', () => {
+    const bad = { ...emptyState(), assets: [{ id: 'a', name: 'PEA', category: 'PEA', value: 700, previousValue: 700 }] };
+    expect(validateState(bad)).toBeNull();
   });
 
   it('complete les champs absents a partir de l etat neutre', () => {
@@ -213,6 +241,68 @@ describe('migrateV2', () => {
 
   it('renvoie null sur une entree non exploitable', () => {
     expect(migrateV2({ nawak: true })).toBeNull();
+  });
+});
+
+describe('loadState', () => {
+  const v2 = {
+    goal: 50000,
+    targetDate: '2029-12-07T23:00:00.000Z',
+    assets: [{ id: 'a', name: 'PEA', category: 'PEA', value: 700, target: 10000, previousValue: 700 }],
+    debts: [{ id: 'd', name: 'Conso', amount: 5000, previousAmount: 5000 }],
+  };
+
+  beforeEach(() => localStorage.clear());
+
+  it('met de cote un v3 illisible au lieu de l ecraser', () => {
+    const illisible = '{ ceci n est pas du JSON';
+    localStorage.setItem('ascend_state_v3', illisible);
+    loadState();
+    expect(localStorage.getItem('ascend_state_v3.broken')).toBe(illisible);
+  });
+
+  // Le declencheur reel : vider le champ de date cible dans les Reglages ecrit
+  // une chaine vide, que la validation rejette au lancement suivant.
+  it('met de cote un v3 invalide au lieu de l ecraser', () => {
+    const abime = JSON.stringify({
+      ...emptyState(),
+      targetDate: '',
+      movements: [{ id: 'm', date: '2026-07-15', kind: 'depense', amount: 60 }],
+    });
+    localStorage.setItem('ascend_state_v3', abime);
+    loadState();
+    expect(localStorage.getItem('ascend_state_v3.broken')).toBe(abime);
+  });
+
+  it('migre le v2 malgre un v3 corrompu', () => {
+    localStorage.setItem('ascend_state_v3', '{{{');
+    localStorage.setItem('ascend_state_v2', JSON.stringify(v2));
+    expect(loadState().debtTotal).toBe(5000);
+  });
+
+  it('laisse intact un v3 valide', () => {
+    const bon = JSON.stringify({ ...emptyState(), goal: 42000 });
+    localStorage.setItem('ascend_state_v3', bon);
+    expect(loadState().goal).toBe(42000);
+    expect(localStorage.getItem('ascend_state_v3.broken')).toBeNull();
+    expect(localStorage.getItem('ascend_state_v3')).toBe(bon);
+  });
+});
+
+describe('saveState', () => {
+  beforeEach(() => localStorage.clear());
+
+  // Un quota atteint remontait jusqu a l ErrorBoundary, et le rechargement
+  // relancait la meme ecriture : l ecran d erreur devenait definitif.
+  it('n echoue pas quand le stockage refuse l ecriture', () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    try {
+      expect(() => saveState(emptyState())).not.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

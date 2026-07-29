@@ -11,9 +11,15 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
+import type { AppState } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const ease = [0.16, 1, 0.3, 1] as const;
+
+// Un etat « vide » est celui qu'on peut remplacer sans rien perdre.
+function aDesDonnees(state: AppState): boolean {
+  return state.movements.length > 0 || state.assets.some((a) => a.value !== 0) || state.debtTotal !== 0;
+}
 
 export function Settings() {
   const { state, setState } = useStore();
@@ -25,6 +31,7 @@ export function Settings() {
   };
 
   const handleImport = async (file: File) => {
+    if (aDesDonnees(state) && !window.confirm('Importer ce fichier remplacera toutes les données actuelles. Continuer ?')) return;
     try {
       const imported = await importState(file);
       setState(() => imported);
@@ -53,7 +60,7 @@ export function Settings() {
             </div>
             <div>
               <Label className="text-xs flex items-center gap-1.5"><Calendar className="h-3 w-3" /> Date cible</Label>
-              <Input type="date" value={state.targetDate} onChange={(e) => setState((prev) => ({ ...prev, targetDate: e.target.value }))} className="mt-1" />
+              <Input type="date" value={state.targetDate} onChange={(e) => { if (e.target.value) setState((prev) => ({ ...prev, targetDate: e.target.value })); }} className="mt-1" />
             </div>
           </div>
         </Card>

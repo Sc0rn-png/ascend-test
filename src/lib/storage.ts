@@ -8,6 +8,7 @@ import {
 
 const STORAGE_KEY = 'ascend_state_v3';
 const LEGACY_KEY = 'ascend_state_v2';
+const BROKEN_KEY = 'ascend_state_v3.broken';
 
 export function generateId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -94,7 +95,7 @@ function isValidMovement(v: unknown): v is Movement {
 function isValidAsset(v: unknown): v is Asset {
   if (!isRecord(v)) return false;
   if (typeof v.id !== 'string' || typeof v.name !== 'string') return false;
-  if (typeof v.value !== 'number' || !Number.isFinite(v.value)) return false;
+  if (!isFiniteNumber(v.value) || !isFiniteNumber(v.previousValue) || !isFiniteNumber(v.target)) return false;
   return ASSET_CATEGORIES.includes(v.category as Asset['category']);
 }
 
@@ -141,13 +142,12 @@ function isValidMonthISO(v: unknown): v is string {
 export function validateState(raw: unknown): AppState | null {
   if (!isRecord(raw)) return null;
 
-  if (Object.keys(raw).length === 0) return null;
+  // `assets` est le champ discriminant : sans lui, n'importe quel objet JSON
+  // passerait pour un export ASCEND et remplacerait tout l'etat.
+  if (!isValidArray(raw.assets, isValidAsset)) return null;
 
   if (raw.movements !== undefined) {
     if (!isValidArray(raw.movements, isValidMovement)) return null;
-  }
-  if (raw.assets !== undefined) {
-    if (!isValidArray(raw.assets, isValidAsset)) return null;
   }
   if (raw.nonFinancialAssets !== undefined) {
     if (!isValidArray(raw.nonFinancialAssets, isValidNonFinancialAsset)) return null;
@@ -204,31 +204,59 @@ export function migrateV2(raw: unknown): AppState | null {
   };
 }
 
-export function loadState(): AppState {
+function readRaw(key: string): string | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+export function loadState(): AppState {
+  // Chaque source a sa propre garde : un v3 corrompu ne doit pas empecher la
+  // migration du v2, qui est peut-etre la derniere copie exploitable.
+  const raw = readRaw(STORAGE_KEY);
+  if (raw) {
+    try {
       const parsed = validateState(JSON.parse(raw));
       if (parsed) return parsed;
+    } catch {
+      // Un stockage corrompu ne doit jamais empecher l'application de demarrer.
     }
-    const legacy = localStorage.getItem(LEGACY_KEY);
-    if (legacy) {
+    // On n'ecrase jamais un contenu qu'on n'a pas su relire : il reste
+    // recuperable a la main sous cette cle.
+    try {
+      localStorage.setItem(BROKEN_KEY, raw);
+    } catch {
+      // Rien de mieux a faire si le stockage refuse aussi cette copie.
+    }
+  }
+
+  const legacy = readRaw(LEGACY_KEY);
+  if (legacy) {
+    try {
       const migrated = migrateV2(JSON.parse(legacy));
       if (migrated) {
         saveState(migrated);
         return migrated;
       }
+    } catch {
+      // Idem : un v2 illisible laisse simplement repartir sur un etat neutre.
     }
-  } catch {
-    // Un stockage corrompu ne doit jamais empecher l'application de demarrer.
   }
+
   const fresh = emptyState();
   saveState(fresh);
   return fresh;
 }
 
 export function saveState(state: AppState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Quota atteint ou stockage refuse : l'echec d'une ecriture ne doit pas
+    // remonter jusqu'a l'ErrorBoundary, que le rechargement ne quitterait plus.
+  }
 }
 
 export function exportState(state: AppState): void {
