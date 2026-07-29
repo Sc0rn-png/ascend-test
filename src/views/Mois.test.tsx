@@ -42,7 +42,46 @@ describe('Mois', () => {
 
     expect(screen.getByText('+1 719 €')).toBeInTheDocument();
     expect(screen.getByText('−60 €')).toBeInTheDocument();
-    expect(screen.getByText('−200 €')).toBeInTheDocument();
+    expect(screen.queryByText('−200 €')).not.toBeInTheDocument();
+  });
+
+  // Un versement deplace l argent vers un placement et fait monter la valeur
+  // nette : le presenter comme une sortie induit en erreur.
+  it('ne prefixe de moins que les depenses', () => {
+    seed({
+      assets: [{ id: 'cto', name: 'CTO', category: 'CTO', value: 1300, target: 0, previousValue: 1300 }],
+      movements: [
+        mvt({ kind: 'investissement', amount: 200, assetId: 'cto' }),
+        mvt({ kind: 'investissement', amount: 100, assetId: 'cto' }),
+        mvt({ kind: 'depense', amount: 60 }),
+        mvt({ kind: 'actif', amount: 40, label: 'Bureau' }),
+      ],
+    });
+    renderMois();
+
+    expect(screen.getByText('200 €')).toBeInTheDocument();
+    expect(screen.getByText('40 €')).toBeInTheDocument();
+    expect(screen.getByText('−60 €')).toBeInTheDocument();
+  });
+
+  it('nomme le placement credite par un versement', () => {
+    seed({
+      assets: [{ id: 'cto', name: 'CTO', category: 'CTO', value: 1300, target: 0, previousValue: 1100 }],
+      movements: [mvt({ kind: 'investissement', amount: 200, assetId: 'cto' })],
+    });
+    renderMois();
+
+    expect(screen.getByText('Investissement — CTO')).toBeInTheDocument();
+  });
+
+  it('retombe sur un libelle neutre quand le placement a disparu', () => {
+    seed({
+      assets: [],
+      movements: [mvt({ kind: 'investissement', amount: 200, assetId: 'efface' })],
+    });
+    renderMois();
+
+    expect(screen.getByText('Investissement')).toBeInTheDocument();
   });
 
   it('supprime un mouvement au clic sur son bouton de suppression', async () => {
@@ -64,7 +103,7 @@ describe('Mois', () => {
 
     expect(screen.queryByText('−60 €')).not.toBeInTheDocument();
     expect(screen.getByText('+1 719 €')).toBeInTheDocument();
-    expect(screen.getByText('−200 €')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Supprimer ce mouvement' })).toHaveLength(2);
   });
 
   it('affiche un taux d’epargne negatif pour un mois deficitaire', () => {

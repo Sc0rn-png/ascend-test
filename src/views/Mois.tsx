@@ -8,7 +8,7 @@ import {
   totalInvested, savingsRate, monthKeysWithActivity,
 } from '@/lib/movements';
 import { Card } from '@/components/ui/card';
-import type { Movement } from '@/lib/types';
+import type { Asset, Movement } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -20,10 +20,13 @@ const ICONS = {
   actif: Sofa,
 } as const;
 
-function describe(m: Movement): string {
+function describe(m: Movement, assets: Asset[]): string {
   if (m.kind === 'revenu') return m.label ? `${m.source} — ${m.label}` : (m.source ?? 'Rentrée');
   if (m.kind === 'depense') return 'Dépense';
-  if (m.kind === 'investissement') return 'Investissement';
+  if (m.kind === 'investissement') {
+    const placement = assets.find((a) => a.id === m.assetId);
+    return placement ? `Investissement — ${placement.name}` : 'Investissement';
+  }
   return m.label ?? 'Actif';
 }
 
@@ -81,6 +84,9 @@ export function Mois() {
             mouvements.map((m) => {
               const Icon = ICONS[m.kind];
               const positif = m.kind === 'revenu';
+              // Seule une depense fait sortir l'argent : un versement le
+              // deplace vers un placement et une acquisition cree un actif.
+              const sortie = m.kind === 'depense';
               return (
                 <Card key={m.id} className="border-border/50 p-3.5">
                   <div className="flex items-center gap-3">
@@ -88,11 +94,11 @@ export function Mois() {
                       <Icon className={cn('h-4 w-4', positif ? 'text-primary' : 'text-muted-foreground')} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{describe(m)}</p>
+                      <p className="truncate text-sm font-medium">{describe(m, state.assets)}</p>
                       <p className="text-[11px] text-muted-foreground">{m.date.split('-').reverse().join('/')}</p>
                     </div>
                     <span className={cn('text-sm font-semibold tabular-nums', positif ? 'text-primary' : 'text-foreground')}>
-                      {positif ? '+' : '−'}{formatEuro(m.amount)}
+                      {positif ? '+' : sortie ? '−' : ''}{formatEuro(m.amount)}
                     </span>
                     <button
                       onClick={() => deleteMovement(m.id)}

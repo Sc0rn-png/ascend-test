@@ -17,6 +17,7 @@ export function MonthlyReport({ monthKey, onDismiss }: { monthKey: string; onDis
   const snap = snapshots[index];
   const previous = index > 0 ? snapshots[index - 1] : null;
   const evolution = previous ? snap.netWorth - previous.netWorth : 0;
+  const dette = previous ? snap.debtTotal - previous.debtTotal : null;
 
   // Un pourcentage n a de sens que sur une base positive : entre deux valeurs
   // nettes negatives, ou de part et d autre de zero, il induit en erreur.
@@ -36,17 +37,26 @@ export function MonthlyReport({ monthKey, onDismiss }: { monthKey: string; onDis
           </button>
         </div>
 
-        <div className={cn('mt-4 flex items-center gap-2 text-3xl font-semibold tabular-nums', evolution >= 0 ? 'text-primary' : 'text-destructive')}>
-          {evolution >= 0 ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6" />}
-          {evolution >= 0 ? '+' : '−'}{formatEuro(Math.abs(evolution))}
-        </div>
-        {percent !== null && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            soit {percent >= 0 ? '+' : ''}{percent.toFixed(1)} % par rapport au mois précédent
-          </p>
+        {previous ? (
+          <>
+            {/* Le chiffre mesure les versements et le desendettement, pas ce que
+                Thomas a mis de cote : il ne doit pas se lire comme une epargne. */}
+            <p className="mt-4 text-xs text-muted-foreground">Variation du patrimoine</p>
+            <div className={cn('mt-1 flex items-center gap-2 text-3xl font-semibold tabular-nums', evolution >= 0 ? 'text-primary' : 'text-destructive')}>
+              {evolution >= 0 ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6" />}
+              {evolution >= 0 ? '+' : '−'}{formatEuro(Math.abs(evolution))}
+            </div>
+            {percent !== null && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                soit {percent >= 0 ? '+' : ''}{percent.toFixed(1)} % par rapport au mois précédent
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">Premier mois enregistré — pas encore de comparaison</p>
         )}
 
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <div className={cn('mt-4 grid gap-2 text-center', dette !== null ? 'grid-cols-2' : 'grid-cols-3')}>
           <div className="rounded-xl bg-secondary/40 p-3">
             <p className="text-[11px] text-muted-foreground">Rentré</p>
             <p className="mt-0.5 text-sm font-semibold tabular-nums">{formatEuro(snap.encaisse)}</p>
@@ -59,6 +69,14 @@ export function MonthlyReport({ monthKey, onDismiss }: { monthKey: string; onDis
             <p className="text-[11px] text-muted-foreground">Investi</p>
             <p className="mt-0.5 text-sm font-semibold tabular-nums">{formatEuro(snap.investi)}</p>
           </div>
+          {dette !== null && (
+            <div className="rounded-xl bg-secondary/40 p-3">
+              <p className="text-[11px] text-muted-foreground">Dette</p>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                {dette > 0 ? '+' : dette < 0 ? '−' : ''}{formatEuro(Math.abs(dette))}
+              </p>
+            </div>
+          )}
         </div>
       </Card>
     </motion.div>
