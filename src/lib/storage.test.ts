@@ -218,6 +218,6 @@ describe('migrateV2', () => {
 
 describe('formatEuro', () => {
   it('formate sans decimales', () => {
-    expect(formatEuro(2840.4).replace(/ | /g, ' ')).toBe('2 840 €');
+    expect(formatEuro(2840.4).replace(/\u202f|\u00a0/g, ' ')).toBe('2 840 €');
   });
 });
